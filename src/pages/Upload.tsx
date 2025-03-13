@@ -2,12 +2,18 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// Define the window interface extension
+declare global {
+  interface Window {
+    openUploadModal?: () => void;
+  }
+}
+
 const Upload = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
     // Open the upload modal and navigate to home
-    // @ts-ignore - Using the globally available function
     if (window.openUploadModal) {
       window.openUploadModal();
     }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Menu, X, Upload, LogIn, Bell } from 'lucide-react';
@@ -20,21 +19,20 @@ interface NavbarProps {
     username: string;
     avatar?: string;
   } | null;
+  onUploadClick?: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
+const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUser, setCurrentUser] = useState(user);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for authenticated user on component mount
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        // Fetch user profile from profiles table
         const { data: profile } = await supabase
           .from('profiles')
           .select('username, avatar_url')
@@ -54,11 +52,9 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
       getUser();
     }
 
-    // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
-          // Fetch user profile when signed in
           const { data: profile } = await supabase
             .from('profiles')
             .select('username, avatar_url')
@@ -111,7 +107,6 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
             </div>
           </div>
 
-          {/* Desktop Search */}
           <div className="hidden md:block flex-1 max-w-xl mx-8">
             <form onSubmit={handleSearch} className="relative">
               <Input
@@ -127,19 +122,16 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
             </form>
           </div>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="flex items-center space-x-4">
               {activeUser ? (
                 <>
                   <Button
-                    asChild
                     variant="ghost"
                     className="text-metanna-black hover:text-metanna-blue"
+                    onClick={onUploadClick}
                   >
-                    <Link to="/upload">
-                      <Upload className="h-5 w-5" />
-                    </Link>
+                    <Upload className="h-5 w-5" />
                   </Button>
                   
                   <Button
@@ -206,7 +198,6 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
             </div>
           </div>
 
-          {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
             <button
               onClick={toggleMobileMenu}
@@ -223,7 +214,6 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
         </div>
       </div>
 
-      {/* Mobile menu */}
       <div className={`md:hidden ${mobileMenuOpen ? 'block' : 'hidden'}`}>
         <div className="pt-2 pb-4 px-4 space-y-4 bg-white border-b border-gray-100">
           <form onSubmit={handleSearch} className="relative">
@@ -253,13 +243,18 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
                 </div>
               </div>
               
-              <Link
-                to="/upload"
+              <button
                 className="block p-2 rounded-lg text-base font-medium text-metanna-black hover:bg-gray-50"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => {
+                  if (onUploadClick) {
+                    onUploadClick();
+                  }
+                  setMobileMenuOpen(false);
+                }}
               >
                 Upload
-              </Link>
+              </button>
+              
               <Link
                 to="/notifications"
                 className="block p-2 rounded-lg text-base font-medium text-metanna-black hover:bg-gray-50"

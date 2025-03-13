@@ -13,6 +13,13 @@ interface PageLayoutProps {
   } | null;
 }
 
+// Make TypeScript recognize the window.openUploadModal property
+declare global {
+  interface Window {
+    openUploadModal?: () => void;
+  }
+}
+
 const PageLayout: React.FC<PageLayoutProps> = ({ 
   children, 
   showSidebar = true,
@@ -30,11 +37,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({
 
   // Make the openUploadModal function available globally
   React.useEffect(() => {
-    // @ts-ignore - Adding a custom property to window
     window.openUploadModal = openUploadModal;
     
     return () => {
-      // @ts-ignore - Cleanup
       delete window.openUploadModal;
     };
   }, []);
