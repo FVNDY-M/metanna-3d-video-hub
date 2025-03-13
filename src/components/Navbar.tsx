@@ -18,36 +18,51 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(user);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check for authenticated user on component mount
     const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        // Fetch user profile from profiles table
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', session.user.id)
-          .single();
-          
-        if (profile) {
-          setCurrentUser({
-            username: profile.username,
-            avatar: profile.avatar_url
-          });
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Fetch user profile from profiles table
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profile) {
+            setCurrentUser({
+              username: profile.username,
+              avatar: profile.avatar_url
+            });
+          }
+        } else {
+          setCurrentUser(null);
         }
+      } catch (error) {
+        console.error('Error fetching user:', error);
+        setCurrentUser(null);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     if (!user) {
       getUser();
+    } else {
+      setIsLoading(false);
     }
 
     // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        
         if (event === 'SIGNED_IN' && session) {
           // Fetch user profile when signed in
           const { data: profile } = await supabase
@@ -101,7 +116,9 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
-            {activeUser ? (
+            {isLoading ? (
+              <div className="w-32 h-8 bg-gray-200 animate-pulse rounded-full"></div>
+            ) : activeUser ? (
               <UserMenu user={activeUser} />
             ) : (
               <AuthButtons />
