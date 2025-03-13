@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
-import { Heart, MessageSquare, Share2, Clock } from 'lucide-react';
+import { Heart, MessageSquare, Share2, Bookmark, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card } from '@/components/ui/card';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 
 // Import the mock data
 import { mockVideos } from '@/utils/mockData';
@@ -20,19 +20,38 @@ const VideoDetail = () => {
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<any[]>([]);
   const [user, setUser] = useState(null); // For demo purposes
-  const [isSubscribed, setIsSubscribed] = useState(false);
   
   // Mock comments data
   const mockComments = [
     {
       id: '1',
       user: {
-        username: '@user1',
+        username: 'JuliaP',
         avatar: 'https://randomuser.me/api/portraits/women/8.jpg',
       },
-      text: 'Amazing environment!',
+      text: 'This is absolutely mind-blowing! The detail in this AR experience is incredible.',
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
       likes: 12,
+    },
+    {
+      id: '2',
+      user: {
+        username: 'AREnthusiast',
+        avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+      },
+      text: 'The spatial audio in this is perfect. It really helps with the immersion.',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // 5 days ago
+      likes: 8,
+    },
+    {
+      id: '3',
+      user: {
+        username: 'TechReviewer',
+        avatar: 'https://randomuser.me/api/portraits/women/23.jpg',
+      },
+      text: 'What hardware did you use to capture this? The tracking is so smooth!',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 7 days ago
+      likes: 5,
     },
   ];
 
@@ -42,25 +61,13 @@ const VideoDetail = () => {
       try {
         // Simulate API call
         setTimeout(() => {
-          const foundVideo = mockVideos.find(v => v.id === id) || {
-            id: '1',
-            title: 'The Healer',
-            thumbnail: '/lovable-uploads/31a37b4a-85a1-4afc-a18b-3ac93bdc37af.png',
-            creator: {
-              username: 'Guillermo Lorca',
-              avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-              subscribers: '100K Subscribers'
-            },
-            views: '3K',
-            likes: 12,
-            comments: 1,
-            immersions: 3000,
-            createdAt: '11 months ago'
-          };
+          const foundVideo = mockVideos.find(v => v.id === id);
           
-          setVideo(foundVideo);
-          setLikeCount(foundVideo.likes);
-          setComments(mockComments);
+          if (foundVideo) {
+            setVideo(foundVideo);
+            setLikeCount(foundVideo.likes);
+            setComments(mockComments);
+          }
           
           setLoading(false);
         }, 800);
@@ -80,8 +87,42 @@ const VideoDetail = () => {
     setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
   };
 
-  const handleSubscribe = () => {
-    setIsSubscribed(!isSubscribed);
+  const handleComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!comment.trim()) return;
+    
+    const newComment = {
+      id: Date.now().toString(),
+      user: {
+        username: 'You',
+        avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
+      },
+      text: comment,
+      createdAt: new Date(),
+      likes: 0,
+    };
+    
+    setComments(prev => [newComment, ...prev]);
+    setComment('');
+  };
+
+  // Format date to relative time
+  const formatRelativeTime = (date: Date | string) => {
+    const now = new Date();
+    const past = new Date(date);
+    const diffInMs = now.getTime() - past.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} min${diffInMinutes === 1 ? '' : 's'} ago`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
+    } else {
+      return `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`;
+    }
   };
 
   if (loading) {
@@ -112,83 +153,147 @@ const VideoDetail = () => {
 
   return (
     <PageLayout user={user}>
-      <div className="max-w-screen-lg mx-auto animate-fade-in p-4">
-        <Card className="overflow-hidden border-0 shadow-lg rounded-2xl">
-          <AspectRatio ratio={16/9}>
-            <img 
-              src={video.thumbnail}
-              alt={video.title}
-              className="w-full h-full object-cover"
-            />
-          </AspectRatio>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-16 animate-fade-in">
+        {/* Video Player */}
+        <div className="mb-6 rounded-xl overflow-hidden shadow-md bg-black aspect-video">
+          <img 
+            src={video.thumbnail}
+            alt={video.title}
+            className="w-full h-full object-cover"
+          />
+          {/* This would be replaced with an actual video player in a real app */}
+        </div>
+        
+        {/* Video Info */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">{video.title}</h1>
           
-          <div className="p-5">
-            <h1 className="text-xl font-semibold mb-4">{video.title}</h1>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
-                  <AvatarFallback className="bg-metanna-blue text-white">
-                    {video.creator.username.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div>
-                  <h3 className="font-medium">{video.creator.username}</h3>
-                  <p className="text-xs text-gray-500">{video.creator.subscribers}</p>
-                </div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center">
+              <Avatar className="h-10 w-10 mr-3">
+                <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
+                <AvatarFallback className="bg-metanna-blue text-white">
+                  {video.creator.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div>
+                <h3 className="font-medium text-gray-900">{video.creator.username}</h3>
+                <p className="text-sm text-gray-500">{video.immersions.toLocaleString()} immersions</p>
               </div>
               
               <Button
-                onClick={handleSubscribe}
-                className={`rounded-full px-6 ${isSubscribed ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-metanna-blue hover:bg-metanna-blue/90'}`}
+                variant="outline"
+                className="ml-4 rounded-full"
               >
-                {isSubscribed ? 'Subscribed' : 'Subscribe'}
+                Follow
               </Button>
             </div>
             
-            <div className="flex items-center gap-4 mt-5">
-              <div className="flex items-center gap-1 text-gray-500">
-                <Heart className={`h-4 w-4 ${isLiked ? 'fill-metanna-blue text-metanna-blue' : ''}`} />
-                <span className="text-sm">{likeCount}</span>
-              </div>
+            <div className="flex space-x-2">
+              <Button
+                variant={isLiked ? "default" : "outline"}
+                className={`flex items-center gap-2 rounded-full ${isLiked ? 'bg-metanna-blue text-white' : ''}`}
+                onClick={handleLike}
+              >
+                <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
+                <span>{likeCount}</span>
+              </Button>
               
-              <div className="flex items-center gap-1 text-gray-500">
-                <MessageSquare className="h-4 w-4" />
-                <span className="text-sm">{comments.length}</span>
-              </div>
-              
-              <div className="flex items-center gap-1 text-gray-500">
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 rounded-full"
+              >
                 <Share2 className="h-4 w-4" />
-              </div>
+                <span>Share</span>
+              </Button>
               
-              <div className="ml-auto flex items-center gap-1 text-gray-500">
-                <Clock className="h-4 w-4" />
-                <span className="text-sm">{video.createdAt}</span>
-              </div>
-            </div>
-            
-            {/* Comments section */}
-            <div className="mt-6 space-y-4">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
-                    <AvatarFallback className="bg-metanna-blue text-white">
-                      {comment.user.username.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div>
-                    <div className="text-sm font-medium">{comment.user.username}</div>
-                    <p className="text-sm">{comment.text}</p>
-                  </div>
-                </div>
-              ))}
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 rounded-full"
+              >
+                <Bookmark className="h-4 w-4" />
+                <span>Save</span>
+              </Button>
             </div>
           </div>
-        </Card>
+        </div>
+        
+        <Separator className="mb-6" />
+        
+        {/* Description */}
+        <div className="mb-8 bg-gray-50 p-4 rounded-lg">
+          <p className="text-gray-700">
+            Experience an immersive augmented reality journey through this stunning virtual environment. 
+            Navigate through interactive elements and discover hidden details throughout this carefully crafted experience.
+          </p>
+          <div className="mt-3 text-sm text-gray-500">
+            <span>Published {formatRelativeTime(video.createdAt)}</span>
+          </div>
+        </div>
+        
+        {/* Comments */}
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Comments ({comments.length})
+          </h2>
+          
+          {/* Comment Form */}
+          <form onSubmit={handleComment} className="mb-6">
+            <Textarea
+              placeholder="Add a comment..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="resize-none mb-3"
+            />
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                className="bg-metanna-blue hover:bg-metanna-blue/90 text-white rounded-full"
+                disabled={!comment.trim()}
+              >
+                Comment
+              </Button>
+            </div>
+          </form>
+          
+          {/* Comments List */}
+          <div className="space-y-4">
+            {comments.map((comment) => (
+              <div key={comment.id} className="flex space-x-3 animate-fade-in">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
+                  <AvatarFallback className="bg-metanna-blue text-white">
+                    {comment.user.username.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h4 className="font-medium text-gray-900">{comment.user.username}</h4>
+                    <span className="text-xs text-gray-500">{formatRelativeTime(comment.createdAt)}</span>
+                  </div>
+                  
+                  <p className="text-gray-700">{comment.text}</p>
+                  
+                  <div className="flex items-center space-x-4 mt-2">
+                    <button className="text-xs text-gray-500 hover:text-metanna-blue flex items-center">
+                      <Heart className="h-3.5 w-3.5 mr-1" />
+                      <span>{comment.likes}</span>
+                    </button>
+                    <button className="text-xs text-gray-500 hover:text-metanna-blue">
+                      Reply
+                    </button>
+                    <button className="text-xs text-gray-500 hover:text-metanna-blue flex items-center">
+                      <Flag className="h-3.5 w-3.5 mr-1" />
+                      Report
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </PageLayout>
   );

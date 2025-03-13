@@ -46,11 +46,7 @@ const Login = () => {
       toast.success('Login successful', {
         description: 'Welcome back to METANNA!'
       });
-      
-      // Add a small delay to ensure the auth state is updated before redirecting
-      setTimeout(() => {
-        navigate('/');
-      }, 500);
+      navigate('/');
     } catch (err) {
       setError('Login failed. Please try again.');
       toast.error('Login failed', {
