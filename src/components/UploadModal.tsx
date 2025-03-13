@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Upload as UploadIcon, Image as ImageIcon, X, Check, Copy } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -31,7 +34,23 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
   const [visibility, setVisibility] = useState('private');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoLink, setVideoLink] = useState<string | null>(null);
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'processing' | 'complete'>('idle');
   const navigate = useNavigate();
+
+  // Check if user is authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        setError('You must be logged in to upload videos');
+        toast.error('Authentication required');
+      }
+    };
+    
+    if (isOpen) {
+      checkAuth();
+    }
+  }, [isOpen]);
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,6 +58,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     
     if (!file.type.startsWith('image/')) {
       setError('Please upload an image file for the thumbnail');
+      toast.error('Invalid file type for thumbnail');
       return;
     }
     
@@ -52,71 +72,140 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     
     if (!file.type.startsWith('video/')) {
       setError('Please upload a video file');
+      toast.error('Invalid file type for video');
       return;
     }
     
     setVideo(file);
     setVideoName(file.name);
     
-    // Simulate uploading
+    // Start simulated upload
     setUploadProgress(0);
+    setUploadPhase('uploading');
     
+    // Simulate upload progress
     const interval = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
-          setVideoLink('https://www.metanna.com/videos/' + Math.random().toString(36).substring(2, 15));
+          setUploadPhase('processing');
+          
+          // After "processing", generate video link
+          setTimeout(() => {
+            const generatedLink = window.location.origin + '/videos/' + uuidv4().slice(0, 8);
+            setVideoLink(generatedLink);
+            setUploadPhase('complete');
+          }, 1500);
+          
           return 100;
         }
-        return prev + 10;
+        return prev + 5;
       });
-    }, 500);
+    }, 200);
   };
 
   const copyVideoLink = () => {
     if (videoLink) {
       navigator.clipboard.writeText(videoLink);
-      // In a real app, you would show a toast notification here
-      console.log('Video link copied to clipboard');
+      toast.success('Video link copied to clipboard');
+    }
+  };
+
+  const validateForm = () => {
+    if (!title.trim()) {
+      setError('Please add a title for your video');
+      toast.error('Title is required');
+      return false;
+    }
+    
+    if (!thumbnail) {
+      setError('Please upload a thumbnail');
+      toast.error('Thumbnail is required');
+      return false;
+    }
+    
+    if (!video) {
+      setError('Please upload a video');
+      toast.error('Video is required');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const uploadToStorage = async (file: File, bucket: string, path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(path);
+        
+      return urlData.publicUrl;
+    } catch (error: any) {
+      console.error('Storage upload error:', error.message);
+      throw error;
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title) {
-      setError('Please add a title for your video');
-      return;
-    }
-    
-    if (!thumbnail) {
-      setError('Please upload a thumbnail');
-      return;
-    }
-    
-    if (!video) {
-      setError('Please upload a video');
-      return;
-    }
+    if (!validateForm()) return;
     
     setLoading(true);
     setError('');
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Get current user
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        throw new Error('You must be logged in to upload videos');
+      }
       
-      // In a real app, this would be an upload API call
-      console.log('Uploading:', { title, description, thumbnail, video, visibility });
+      // Generate unique file names to prevent overwrites
+      const videoFileName = `${userData.user.id}/${uuidv4()}-${video!.name}`;
+      const thumbnailFileName = `${userData.user.id}/${uuidv4()}-${thumbnail!.name}`;
+      
+      // Upload files to storage
+      const thumbnailUrl = await uploadToStorage(thumbnail!, 'thumbnails', thumbnailFileName);
+      const videoUrl = await uploadToStorage(video!, 'videos', videoFileName);
+      
+      // Create record in videos table
+      const { data, error } = await supabase
+        .from('videos')
+        .insert({
+          user_id: userData.user.id,
+          title,
+          description,
+          thumbnail_url: thumbnailUrl,
+          video_url: videoUrl,
+          visibility
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      // Show success message
+      toast.success('Video uploaded successfully!');
       
       // Close modal and reset form
       onClose();
       resetForm();
       
-      // For demo purposes - navigate to home page
+      // Navigate to home page
       navigate('/');
-    } catch (err) {
-      setError('Failed to upload video. Please try again.');
+    } catch (err: any) {
+      setError(`Failed to upload video: ${err.message}`);
+      toast.error('Upload failed. Please try again.');
       console.error('Upload error:', err);
     } finally {
       setLoading(false);
@@ -133,6 +222,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     setVideoLink(null);
     setError('');
     setUploadProgress(0);
+    setUploadPhase('idle');
   };
 
   const handleClose = () => {
@@ -208,36 +298,41 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
                 
                 <div className="md:col-span-2 bg-[#F1F5FF] p-6 rounded-lg space-y-4">
                   <div className="bg-gray-800 aspect-video rounded-md flex items-center justify-center text-white">
-                    {uploadProgress > 0 && uploadProgress < 100 ? (
+                    {uploadPhase === 'uploading' ? (
                       <div className="text-center">
                         <p className="mb-2">Uploading video...</p>
                         <div className="w-48 mx-auto">
                           <Progress value={uploadProgress} className="h-2" />
                         </div>
                       </div>
+                    ) : uploadPhase === 'processing' ? (
+                      <div className="text-center">
+                        <p className="mb-2">Processing video...</p>
+                        <div className="w-48 mx-auto">
+                          <Progress value={100} className="h-2" />
+                        </div>
+                      </div>
+                    ) : uploadPhase === 'complete' ? (
+                      <div className="text-center">
+                        <Check className="mx-auto h-10 w-10 text-green-400 mb-2" />
+                        <p className="text-sm">Video uploaded</p>
+                      </div>
                     ) : (
                       <div 
                         className="w-full h-full flex items-center justify-center cursor-pointer"
                         onClick={() => document.getElementById('video-upload')?.click()}
                       >
-                        {video ? (
-                          <div className="text-center">
-                            <Check className="mx-auto h-10 w-10 text-green-400 mb-2" />
-                            <p className="text-sm">Video uploaded</p>
-                          </div>
-                        ) : (
-                          <div className="text-center">
-                            <UploadIcon className="mx-auto h-10 w-10 mb-2" />
-                            <p className="text-sm">Upload video</p>
-                            <Input
-                              id="video-upload"
-                              type="file"
-                              accept="video/*"
-                              onChange={handleVideoChange}
-                              className="sr-only"
-                            />
-                          </div>
-                        )}
+                        <div className="text-center">
+                          <UploadIcon className="mx-auto h-10 w-10 mb-2" />
+                          <p className="text-sm">Upload video</p>
+                          <Input
+                            id="video-upload"
+                            type="file"
+                            accept="video/*"
+                            onChange={handleVideoChange}
+                            className="sr-only"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>

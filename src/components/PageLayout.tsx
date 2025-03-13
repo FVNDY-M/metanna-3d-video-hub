@@ -1,8 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import UploadModal from './UploadModal';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -26,8 +29,29 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   user = null
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{
+    username: string;
+    avatar?: string;
+  } | null>(user);
+  const navigate = useNavigate();
 
-  const openUploadModal = () => {
+  useEffect(() => {
+    // Set initial user state from props
+    if (user) {
+      setCurrentUser(user);
+    }
+  }, [user]);
+
+  const openUploadModal = async () => {
+    // Check if user is authenticated before opening modal
+    const { data } = await supabase.auth.getSession();
+    
+    if (!data.session) {
+      toast.error('You must be logged in to upload videos');
+      navigate('/login');
+      return;
+    }
+    
     setIsUploadModalOpen(true);
   };
 
@@ -46,7 +70,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar user={user} onUploadClick={openUploadModal} />
+      <Navbar user={currentUser} onUploadClick={openUploadModal} />
       
       <div className="flex flex-1">
         {showSidebar && <Sidebar />}
@@ -59,7 +83,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({
       <UploadModal 
         isOpen={isUploadModalOpen} 
         onClose={closeUploadModal}
-        user={user}
+        user={currentUser}
       />
     </div>
   );

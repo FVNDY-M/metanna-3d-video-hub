@@ -1,6 +1,8 @@
 
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Define the window interface extension
 declare global {
@@ -13,11 +15,24 @@ const Upload = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Open the upload modal and navigate to home
-    if (window.openUploadModal) {
-      window.openUploadModal();
-    }
-    navigate('/');
+    // Check if user is authenticated
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      
+      if (!data.session) {
+        toast.error('You must be logged in to upload videos');
+        navigate('/login');
+        return;
+      }
+      
+      // Open the upload modal and navigate to home
+      if (window.openUploadModal) {
+        window.openUploadModal();
+      }
+      navigate('/');
+    };
+    
+    checkAuth();
   }, [navigate]);
 
   // This component will only briefly be shown during redirect
