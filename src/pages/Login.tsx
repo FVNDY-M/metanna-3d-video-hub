@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import MetannaLogo from '@/components/MetannaLogo';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -25,16 +27,31 @@ const Login = () => {
     setError('');
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, this would be an auth API call
-      console.log('Logging in with:', { email, password });
-      
-      // For demo purposes - navigate to home page
+      // Authenticate with Supabase
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (signInError) {
+        setError('Invalid email or password');
+        toast.error('Login failed', {
+          description: 'Please check your credentials and try again.'
+        });
+        console.error('Login error:', signInError);
+        return;
+      }
+
+      // Success message and redirect
+      toast.success('Login successful', {
+        description: 'Welcome back to METANNA!'
+      });
       navigate('/');
     } catch (err) {
-      setError('Invalid email or password');
+      setError('Login failed. Please try again.');
+      toast.error('Login failed', {
+        description: 'An unexpected error occurred. Please try again.'
+      });
       console.error('Login error:', err);
     } finally {
       setLoading(false);

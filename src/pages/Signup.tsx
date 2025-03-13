@@ -56,6 +56,9 @@ const Signup = () => {
       const usernameExists = await checkUsernameExists(username);
       if (usernameExists) {
         setError('Username already exists');
+        toast.error('Registration failed', {
+          description: 'This username is already taken. Please choose another one.'
+        });
         setLoading(false);
         return;
       }
@@ -74,19 +77,30 @@ const Signup = () => {
       if (signUpError) {
         if (signUpError.message.includes('User already registered')) {
           setError('An account with this email already exists');
+          toast.error('Registration failed', {
+            description: 'An account with this email already exists.'
+          });
         } else {
           setError(signUpError.message);
+          toast.error('Registration failed', {
+            description: signUpError.message
+          });
         }
         console.error('Signup error:', signUpError);
         return;
       }
 
       // Success message and redirect
-      toast.success('Account created successfully!');
+      toast.success('Account created successfully!', {
+        description: 'Welcome to METANNA!'
+      });
       navigate('/');
     } catch (err) {
       console.error('Signup error:', err);
       setError('Failed to create account. Please try again.');
+      toast.error('Registration failed', {
+        description: 'An unexpected error occurred. Please try again.'
+      });
     } finally {
       setLoading(false);
     }
