@@ -1,11 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import PageLayout from '@/components/PageLayout';
-import VideoCard, { VideoData } from '@/components/VideoCard';
-import EmptyState from '@/components/EmptyState';
+// This file contains mock data for the application
+import { VideoData } from '@/components/VideoCard';
 
-// Temporary mock data - this would be replaced with actual API calls in a real application
-const mockVideos: VideoData[] = [
+export const mockVideos: VideoData[] = [
   {
     id: '1',
     title: 'The Healer',
@@ -85,52 +82,3 @@ const mockVideos: VideoData[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 110), // 110 days ago
   },
 ];
-
-const Index = () => {
-  const [videos, setVideos] = useState<VideoData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null); // In a real app, this would be from an auth context
-
-  useEffect(() => {
-    // Simulate API call
-    const fetchVideos = async () => {
-      setLoading(true);
-      try {
-        // In a real app, this would be an API call
-        setTimeout(() => {
-          setVideos(mockVideos);
-          setLoading(false);
-        }, 800);
-      } catch (error) {
-        console.error('Error fetching videos:', error);
-        setLoading(false);
-      }
-    };
-
-    fetchVideos();
-  }, []);
-
-  return (
-    <PageLayout user={user}>
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-8">Discover AR Experiences</h1>
-        
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="loader"></div>
-          </div>
-        ) : videos.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {videos.map((video) => (
-              <VideoCard key={video.id} video={video} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState />
-        )}
-      </div>
-    </PageLayout>
-  );
-};
-
-export default Index;
