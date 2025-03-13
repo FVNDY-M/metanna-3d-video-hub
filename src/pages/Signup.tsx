@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import MetannaLogo from '@/components/MetannaLogo';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const Signup = () => {
   const [username, setUsername] = useState('');
@@ -16,6 +18,17 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  // Function to check if username already exists
+  const checkUsernameExists = async (username: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', username)
+      .single();
+    
+    return !!data;
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,17 +52,41 @@ const Signup = () => {
     setError('');
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, this would be an auth API call
-      console.log('Signing up with:', { username, email, password });
-      
-      // For demo purposes - navigate to home page
+      // Check if username already exists
+      const usernameExists = await checkUsernameExists(username);
+      if (usernameExists) {
+        setError('Username already exists');
+        setLoading(false);
+        return;
+      }
+
+      // Register the user with Supabase
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username
+          },
+        }
+      });
+
+      if (signUpError) {
+        if (signUpError.message.includes('User already registered')) {
+          setError('An account with this email already exists');
+        } else {
+          setError(signUpError.message);
+        }
+        console.error('Signup error:', signUpError);
+        return;
+      }
+
+      // Success message and redirect
+      toast.success('Account created successfully!');
       navigate('/');
     } catch (err) {
-      setError('Failed to create account. Please try again.');
       console.error('Signup error:', err);
+      setError('Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
