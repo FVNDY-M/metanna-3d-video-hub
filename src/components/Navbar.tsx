@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Menu, X, Upload, LogIn, ChevronDown } from 'lucide-react';
+import { Search, Menu, X, Upload, LogIn, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import MetannaLogo from './MetannaLogo';
 import { Input } from './ui/input';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NavbarProps {
   user?: {
@@ -24,7 +25,62 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentUser, setCurrentUser] = useState(user);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check for authenticated user on component mount
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Fetch user profile from profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (profile) {
+          setCurrentUser({
+            username: profile.username,
+            avatar: profile.avatar_url
+          });
+        }
+      }
+    };
+
+    if (!user) {
+      getUser();
+    }
+
+    // Subscribe to auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // Fetch user profile when signed in
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profile) {
+            setCurrentUser({
+              username: profile.username,
+              avatar: profile.avatar_url
+            });
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+        }
+      }
+    );
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [user]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +92,14 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    navigate('/login');
+  };
+
+  const activeUser = currentUser || user;
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-100">
@@ -66,26 +130,35 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
           {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="flex items-center space-x-4">
-              {user ? (
+              {activeUser ? (
                 <>
                   <Button
                     asChild
                     variant="ghost"
-                    className="flex items-center gap-2 text-metanna-black hover:text-metanna-blue"
+                    className="text-metanna-black hover:text-metanna-blue"
                   >
                     <Link to="/upload">
-                      <Upload className="h-4 w-4" />
-                      <span>Upload</span>
+                      <Upload className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                  
+                  <Button
+                    asChild
+                    variant="ghost"
+                    className="text-metanna-black hover:text-metanna-blue"
+                  >
+                    <Link to="/notifications">
+                      <Bell className="h-5 w-5" />
                     </Link>
                   </Button>
                   
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="relative rounded-full h-8 w-8 p-0">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.avatar} alt={user.username} />
+                      <Button variant="ghost" className="relative rounded-full h-9 w-9 p-0 bg-metanna-blue text-white">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={activeUser.avatar} alt={activeUser.username} />
                           <AvatarFallback className="bg-metanna-blue text-white">
-                            {user.username.charAt(0).toUpperCase()}
+                            {activeUser.username.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       </Button>
@@ -93,7 +166,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
                     <DropdownMenuContent align="end" className="w-56 mt-2 animate-scale-in">
                       <div className="flex items-center justify-start p-2">
                         <div className="flex flex-col space-y-1 leading-none">
-                          <p className="font-medium">{user.username}</p>
+                          <p className="font-medium">{activeUser.username}</p>
                         </div>
                       </div>
                       <DropdownMenuSeparator />
@@ -110,10 +183,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="cursor-pointer text-destructive focus:text-destructive"
-                        onClick={() => {
-                          // Handle logout
-                          navigate('/login');
-                        }}
+                        onClick={handleLogout}
                       >
                         Log out
                       </DropdownMenuItem>
@@ -169,17 +239,17 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
             </div>
           </form>
 
-          {user ? (
+          {activeUser ? (
             <div className="space-y-2">
               <div className="flex items-center space-x-3 p-2 rounded-lg">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={user.avatar} alt={user.username} />
+                <Avatar className="h-10 w-10 bg-metanna-blue text-white">
+                  <AvatarImage src={activeUser.avatar} alt={activeUser.username} />
                   <AvatarFallback className="bg-metanna-blue text-white">
-                    {user.username.charAt(0).toUpperCase()}
+                    {activeUser.username.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-medium">{user.username}</p>
+                  <p className="font-medium">{activeUser.username}</p>
                 </div>
               </div>
               
@@ -189,6 +259,13 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Upload
+              </Link>
+              <Link
+                to="/notifications"
+                className="block p-2 rounded-lg text-base font-medium text-metanna-black hover:bg-gray-50"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Notifications
               </Link>
               <Link
                 to="/profile"
@@ -207,9 +284,8 @@ const Navbar: React.FC<NavbarProps> = ({ user = null }) => {
               <button
                 className="block w-full text-left p-2 rounded-lg text-base font-medium text-destructive hover:bg-gray-50"
                 onClick={() => {
-                  // Handle logout
+                  handleLogout();
                   setMobileMenuOpen(false);
-                  navigate('/login');
                 }}
               >
                 Log out
