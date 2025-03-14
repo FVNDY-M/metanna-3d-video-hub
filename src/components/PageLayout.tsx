@@ -75,7 +75,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({
       <div className="flex flex-1">
         {showSidebar && <Sidebar />}
         
-        <main className={`flex-1 ${showSidebar ? 'md:ml-56' : ''} animate-fade-in`}>
+        <main className={`flex-1 ${showSidebar ? 'md:pl-56' : ''} animate-fade-in`}>
           {children}
         </main>
       </div>

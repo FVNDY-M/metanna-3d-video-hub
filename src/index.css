@@ -85,6 +85,7 @@
 
 .video-card {
   @apply relative overflow-hidden transition-all duration-300 rounded-xl hover:shadow-xl;
+  height: 100%;
 }
 
 .video-card:hover {
