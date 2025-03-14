@@ -135,9 +135,17 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
 
   const uploadToStorage = async (file: File, bucket: string, path: string) => {
     try {
+      // Fix: Use only alphanumeric characters, underscores, and dashes in file paths
+      // Remove any special characters from filenames and use a properly formatted path
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = path ? `${path}/${fileName}` : fileName;
+      
+      console.log(`Uploading to bucket: ${bucket}, path: ${filePath}`);
+      
       const { data, error } = await supabase.storage
         .from(bucket)
-        .upload(path, file, {
+        .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true
         });
@@ -147,7 +155,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
       // Get the public URL
       const { data: urlData } = supabase.storage
         .from(bucket)
-        .getPublicUrl(path);
+        .getPublicUrl(filePath);
         
       return urlData.publicUrl;
     } catch (error: any) {
@@ -171,13 +179,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
         throw new Error('You must be logged in to upload videos');
       }
       
-      // Generate unique file names to prevent overwrites
-      const videoFileName = `${userData.user.id}/${uuidv4()}-${video!.name}`;
-      const thumbnailFileName = `${userData.user.id}/${uuidv4()}-${thumbnail!.name}`;
-      
-      // Upload files to storage
-      const thumbnailUrl = await uploadToStorage(thumbnail!, 'thumbnails', thumbnailFileName);
-      const videoUrl = await uploadToStorage(video!, 'videos', videoFileName);
+      // Use simplified file paths that don't include user IDs directly in the path
+      // Instead use unique UUIDs for the filenames
+      const thumbnailUrl = await uploadToStorage(thumbnail!, 'thumbnails', '');
+      const videoUrl = await uploadToStorage(video!, 'videos', '');
       
       // Create record in videos table
       const { data, error } = await supabase
@@ -233,6 +238,9 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader>
+          <DialogTitle className="sr-only">Upload Video</DialogTitle>
+        </DialogHeader>
         <div className="bg-[#F8FAFC] p-8 rounded-lg">
           {error && (
             <div className="mb-6 p-4 bg-red-50 text-red-500 rounded-lg text-sm">
