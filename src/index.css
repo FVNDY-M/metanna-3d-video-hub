@@ -84,7 +84,8 @@
 }
 
 .video-card {
-  @apply relative overflow-hidden transition-all duration-300 rounded-xl hover:shadow-xl w-full;
+  @apply relative overflow-hidden transition-all duration-300 rounded-xl hover:shadow-xl;
+  height: 100%;
 }
 
 .video-card:hover {
@@ -167,18 +168,4 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
-}
-
-/* Animation for fade in */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-in-out;
 }
