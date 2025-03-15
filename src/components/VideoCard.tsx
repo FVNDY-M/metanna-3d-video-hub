@@ -45,14 +45,18 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
   };
 
   return (
-    <div className={`video-card group ${className}`}>
-      <Link to={`/video/${video.id}`} className="block rounded-xl overflow-hidden">
-        <div className="relative">
+    <div className={`video-card group w-full ${className}`}>
+      <Link to={`/video/${video.id}`} className="block w-full rounded-xl overflow-hidden">
+        <div className="relative aspect-video">
           <img 
-            src={video.thumbnail} 
-            alt={video.title} 
-            className="video-thumbnail"
+            src={video.thumbnail || '/placeholder.svg'} 
+            alt={video.title}
+            className="video-thumbnail w-full h-full object-cover"
             loading="lazy"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = '/placeholder.svg';
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
@@ -61,14 +65,14 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
       <div className="flex items-center mt-3 space-x-3">
         <Avatar className="h-8 w-8">
           <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
-          <AvatarFallback className="bg-metanna-blue text-white">
+          <AvatarFallback className="bg-indigo-600 text-white">
             {video.creator.username.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         
         <div className="flex-1 min-w-0">
           <Link to={`/video/${video.id}`} className="block">
-            <h3 className="text-sm font-medium text-gray-900 truncate hover:text-metanna-blue transition-colors">
+            <h3 className="text-sm font-medium text-gray-900 truncate hover:text-indigo-600 transition-colors">
               {video.title}
             </h3>
           </Link>
@@ -76,7 +80,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
           <div className="flex items-center text-xs text-gray-500 mt-1 space-x-3">
             <span>{video.creator.username}</span>
             <span>·</span>
-            <span>{video.immersions} immersions</span>
+            <span>{video.immersions.toLocaleString()} immersions</span>
             <span>·</span>
             <span>{getTimeDifference(video.createdAt)}</span>
           </div>
@@ -84,11 +88,11 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
           <div className="flex items-center mt-2 space-x-4">
             <div className="flex items-center text-xs text-gray-500">
               <Heart className="h-3.5 w-3.5 mr-1" />
-              <span>{video.likes}</span>
+              <span>{video.likes.toLocaleString()}</span>
             </div>
             <div className="flex items-center text-xs text-gray-500">
               <MessageSquare className="h-3.5 w-3.5 mr-1" />
-              <span>{video.comments}</span>
+              <span>{video.comments.toLocaleString()}</span>
             </div>
           </div>
         </div>
