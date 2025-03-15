@@ -73,9 +73,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({
       <Navbar user={currentUser} onUploadClick={openUploadModal} />
       
       <div className="flex flex-1">
-        {showSidebar && <Sidebar />}
+        {showSidebar && <Sidebar className="fixed z-10" />}
         
-        <main className={`flex-1 ${showSidebar ? 'md:ml-56' : ''} animate-fade-in`}>
+        <main className={`flex-1 ${showSidebar ? 'ml-0 md:ml-56' : ''} animate-fade-in`}>
           {children}
         </main>
       </div>
