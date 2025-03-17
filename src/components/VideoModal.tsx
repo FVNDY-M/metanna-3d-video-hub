@@ -8,9 +8,11 @@ import {
 } from "@/components/ui/dialog";
 import { Heart, Share2, MessageSquare, Eye } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from "@/components/ui/button";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
+import { useNavigate } from 'react-router-dom';
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -22,6 +24,10 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
   const [video, setVideo] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<Array<{id: string, user: {username: string, avatar?: string}, content: string}>>([]);
+  const [commentText, setCommentText] = useState('');
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchVideoDetails = async () => {
@@ -96,6 +102,60 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     }
   }, [isOpen, videoId]);
 
+  // Check if user is authenticated
+  const checkAuth = async () => {
+    const { data } = await supabase.auth.getSession();
+    return !!data.session;
+  };
+
+  const handleAuthAction = async (action: () => void, actionName: string) => {
+    const isAuthenticated = await checkAuth();
+    
+    if (isAuthenticated) {
+      action();
+    } else {
+      toast.error(`You need to be logged in to ${actionName}`, {
+        action: {
+          label: 'Login',
+          onClick: () => navigate('/login'),
+        },
+      });
+    }
+  };
+
+  const handleSubscribe = () => {
+    handleAuthAction(() => {
+      // Subscription logic would go here
+      setIsSubscribed(!isSubscribed);
+      toast.success(isSubscribed ? 'Unsubscribed successfully' : 'Subscribed successfully');
+    }, 'subscribe');
+  };
+
+  const handleLike = () => {
+    handleAuthAction(() => {
+      // Like logic would go here
+      setIsLiked(!isLiked);
+      toast.success(isLiked ? 'Removed like' : 'Added like');
+    }, 'like this video');
+  };
+
+  const handleComment = () => {
+    if (!commentText.trim()) return;
+    
+    handleAuthAction(() => {
+      // Comment submission logic would go here
+      const newComment = {
+        id: Date.now().toString(),
+        user: { username: '@current_user' },
+        content: commentText
+      };
+      
+      setComments([...comments, newComment]);
+      setCommentText('');
+      toast.success('Comment added successfully');
+    }, 'comment');
+  };
+
   // Calculate time difference for display
   const getTimeDifference = (date: Date | string) => {
     const now = new Date();
@@ -155,9 +215,16 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                   </div>
                 </div>
                 
-                <button className="bg-indigo-600 text-white px-6 py-2 rounded-full hover:bg-indigo-700 transition-colors">
-                  Subscribe
-                </button>
+                <Button 
+                  onClick={handleSubscribe}
+                  className={`px-6 py-2 rounded-full transition-colors ${
+                    isSubscribed 
+                      ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' 
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
+                >
+                  {isSubscribed ? 'Subscribed' : 'Subscribe'}
+                </Button>
               </div>
               
               {/* Video stats */}
@@ -167,8 +234,8 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                     <Eye className="h-4 w-4 mr-1" />
                     <span>{video.immersions.toLocaleString()}</span>
                   </div>
-                  <div className="flex items-center">
-                    <Heart className="h-4 w-4 mr-1" />
+                  <div className="flex items-center cursor-pointer" onClick={handleLike}>
+                    <Heart className={`h-4 w-4 mr-1 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
                     <span>{video.likes.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center">
@@ -188,10 +255,35 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-3">Comments</h3>
                 
+                {/* Add comment */}
+                <div className="flex items-start space-x-3 mb-6">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-gray-200">U</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <textarea 
+                      placeholder="Add a comment..." 
+                      className="w-full border rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      rows={2}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <Button 
+                        size="sm"
+                        onClick={handleComment}
+                        disabled={!commentText.trim()}
+                      >
+                        Comment
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
                 {comments.map(comment => (
                   <div key={comment.id} className="flex space-x-3 mb-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
+                      <AvatImage src={comment.user.avatar} alt={comment.user.username} />
                       <AvatarFallback className="bg-gray-200">
                         {comment.user.username.charAt(1).toUpperCase()}
                       </AvatarFallback>

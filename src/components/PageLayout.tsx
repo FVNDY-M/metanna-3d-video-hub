@@ -46,13 +46,71 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     }
   }, [user]);
 
+  // Check authentication status
+  useEffect(() => {
+    // Check for current session on component mount
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        // Fetch user profile if logged in
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', data.session.user.id)
+          .single();
+          
+        if (profileData) {
+          setCurrentUser({
+            username: profileData.username,
+            avatar: profileData.avatar_url || undefined
+          });
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    };
+    
+    checkSession();
+    
+    // Subscribe to auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // Fetch user profile when signed in
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profileData) {
+            setCurrentUser({
+              username: profileData.username,
+              avatar: profileData.avatar_url || undefined
+            });
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+        }
+      }
+    );
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   const openUploadModal = async () => {
     // Check if user is authenticated before opening modal
     const { data } = await supabase.auth.getSession();
     
     if (!data.session) {
-      toast.error('You must be logged in to upload videos');
-      navigate('/login');
+      toast.error('You must be logged in to upload videos', {
+        action: {
+          label: 'Login',
+          onClick: () => navigate('/login'),
+        },
+      });
       return;
     }
     
