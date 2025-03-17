@@ -9,8 +9,10 @@ export interface VideoData {
   thumbnail: string;
   videoUrl?: string;
   creator: {
+    id?: string;
     username: string;
     avatar?: string;
+    subscribers?: number;
   };
   likes: number;
   comments: number;

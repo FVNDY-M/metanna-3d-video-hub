@@ -24,7 +24,9 @@ const Index = () => {
             thumbnail_url,
             created_at,
             user_id,
-            views
+            views,
+            likes_count,
+            comments_count
           `)
           .eq('visibility', 'public')
           .order('created_at', { ascending: false });
@@ -40,26 +42,23 @@ const Index = () => {
               // Fetch user profile data for each video
               const { data: profileData } = await supabase
                 .from('profiles')
-                .select('username, avatar_url')
+                .select('username, avatar_url, subscriber_count')
                 .eq('id', video.user_id)
                 .single();
-
-              // Calculate random values for likes, comments for demonstration
-              // In a real app, these would come from their own tables
-              const randomLikes = Math.floor(Math.random() * 1000);
-              const randomComments = Math.floor(Math.random() * 200);
 
               return {
                 id: video.id,
                 title: video.title,
                 thumbnail: video.thumbnail_url,
                 creator: {
+                  id: video.user_id,
                   username: profileData?.username || 'Unknown Creator',
-                  avatar: profileData?.avatar_url || `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`,
+                  avatar: profileData?.avatar_url,
+                  subscribers: profileData?.subscriber_count || 0
                 },
-                likes: randomLikes,
-                comments: randomComments,
-                immersions: video.views,
+                likes: video.likes_count || 0,
+                comments: video.comments_count || 0,
+                immersions: video.views || 0,
                 createdAt: video.created_at,
               };
             })

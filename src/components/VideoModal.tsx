@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { 
   Dialog, 
@@ -19,14 +20,47 @@ interface VideoModalProps {
   videoId: string | null;
 }
 
+interface CommentData {
+  id: string;
+  user: {
+    username: string;
+    avatar?: string;
+  };
+  content: string;
+  created_at: string;
+}
+
 const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => {
   const [video, setVideo] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [comments, setComments] = useState<Array<{id: string, user: {username: string, avatar?: string}, content: string}>>([]);
+  const [comments, setComments] = useState<CommentData[]>([]);
   const [commentText, setCommentText] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkCurrentUser = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (session.session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .eq('id', session.session.user.id)
+          .single();
+          
+        if (profile) {
+          setCurrentUser({
+            id: profile.id,
+            username: profile.username
+          });
+        }
+      }
+    };
+    
+    checkCurrentUser();
+  }, []);
 
   useEffect(() => {
     const fetchVideoDetails = async () => {
@@ -43,7 +77,9 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             video_url,
             created_at,
             user_id,
-            views
+            views,
+            likes_count,
+            comments_count
           `)
           .eq('id', videoId)
           .single();
@@ -53,12 +89,9 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         if (videoData) {
           const { data: profileData } = await supabase
             .from('profiles')
-            .select('username, avatar_url')
+            .select('username, avatar_url, subscriber_count')
             .eq('id', videoData.user_id)
             .single();
-
-          const randomLikes = Math.floor(Math.random() * 2000);
-          const randomComments = Math.floor(Math.random() * 100);
 
           setVideo({
             id: videoData.id,
@@ -66,22 +99,65 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             thumbnail: videoData.thumbnail_url,
             videoUrl: videoData.video_url,
             creator: {
+              id: videoData.user_id,
               username: profileData?.username || 'Unknown Creator',
               avatar: profileData?.avatar_url,
+              subscribers: profileData?.subscriber_count || 0
             },
-            likes: randomLikes,
-            comments: randomComments,
+            likes: videoData.likes_count || 0,
+            comments: videoData.comments_count || 0,
             immersions: videoData.views || 0,
             createdAt: videoData.created_at,
           });
 
-          setComments([
-            {
-              id: '1',
-              user: { username: '@user1', avatar: undefined },
-              content: 'Amazing environment!'
-            },
-          ]);
+          // Check if current user liked the video
+          if (currentUser) {
+            const { data: likeData } = await supabase
+              .from('likes')
+              .select('id')
+              .eq('video_id', videoId)
+              .eq('user_id', currentUser.id)
+              .maybeSingle();
+              
+            setIsLiked(!!likeData);
+            
+            // Check if current user is subscribed to the creator
+            const { data: subscriptionData } = await supabase
+              .from('subscriptions')
+              .select('id')
+              .eq('creator_id', videoData.user_id)
+              .eq('subscriber_id', currentUser.id)
+              .maybeSingle();
+              
+            setIsSubscribed(!!subscriptionData);
+          }
+
+          // Fetch comments for this video
+          const { data: commentsData } = await supabase
+            .from('comments')
+            .select(`
+              id,
+              content,
+              created_at,
+              user_id,
+              profiles(username, avatar_url)
+            `)
+            .eq('video_id', videoId)
+            .order('created_at', { ascending: false });
+
+          if (commentsData) {
+            const formattedComments = commentsData.map(comment => ({
+              id: comment.id,
+              user: {
+                username: comment.profiles.username,
+                avatar: comment.profiles.avatar_url
+              },
+              content: comment.content,
+              created_at: comment.created_at
+            }));
+            
+            setComments(formattedComments);
+          }
         }
       } catch (error) {
         console.error('Error fetching video details:', error);
@@ -94,18 +170,18 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     if (isOpen && videoId) {
       fetchVideoDetails();
     }
-  }, [isOpen, videoId]);
+  }, [isOpen, videoId, currentUser]);
 
   const checkAuth = async () => {
     const { data } = await supabase.auth.getSession();
     return !!data.session;
   };
 
-  const handleAuthAction = async (action: () => void, actionName: string) => {
+  const handleAuthAction = async (action: () => Promise<void>, actionName: string) => {
     const isAuthenticated = await checkAuth();
     
     if (isAuthenticated) {
-      action();
+      await action();
     } else {
       toast.error(`You need to be logged in to ${actionName}`, {
         action: {
@@ -117,31 +193,153 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
   };
 
   const handleSubscribe = () => {
-    handleAuthAction(() => {
-      setIsSubscribed(!isSubscribed);
-      toast.success(isSubscribed ? 'Unsubscribed successfully' : 'Subscribed successfully');
+    handleAuthAction(async () => {
+      if (!video || !currentUser) return;
+      
+      if (isSubscribed) {
+        // Unsubscribe logic
+        const { error } = await supabase
+          .from('subscriptions')
+          .delete()
+          .eq('subscriber_id', currentUser.id)
+          .eq('creator_id', video.creator.id);
+          
+        if (error) {
+          toast.error('Failed to unsubscribe');
+          console.error('Unsubscribe error:', error);
+          return;
+        }
+        
+        setIsSubscribed(false);
+        toast.success('Unsubscribed successfully');
+      } else {
+        // Subscribe logic
+        const { error } = await supabase
+          .from('subscriptions')
+          .insert({
+            subscriber_id: currentUser.id,
+            creator_id: video.creator.id
+          });
+          
+        if (error) {
+          toast.error('Failed to subscribe');
+          console.error('Subscribe error:', error);
+          return;
+        }
+        
+        setIsSubscribed(true);
+        toast.success('Subscribed successfully');
+      }
+      
+      // Update the video object to reflect the new subscriber count
+      if (video) {
+        setVideo({
+          ...video,
+          creator: {
+            ...video.creator,
+            subscribers: isSubscribed ? 
+              Math.max(0, (video.creator.subscribers || 0) - 1) : 
+              (video.creator.subscribers || 0) + 1
+          }
+        });
+      }
     }, 'subscribe');
   };
 
   const handleLike = () => {
-    handleAuthAction(() => {
-      setIsLiked(!isLiked);
-      toast.success(isLiked ? 'Removed like' : 'Added like');
+    handleAuthAction(async () => {
+      if (!video || !currentUser) return;
+      
+      if (isLiked) {
+        // Unlike logic
+        const { error } = await supabase
+          .from('likes')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('video_id', video.id);
+          
+        if (error) {
+          toast.error('Failed to remove like');
+          console.error('Unlike error:', error);
+          return;
+        }
+        
+        setIsLiked(false);
+        setVideo({
+          ...video,
+          likes: Math.max(0, video.likes - 1)
+        });
+        toast.success('Removed like');
+      } else {
+        // Like logic
+        const { error } = await supabase
+          .from('likes')
+          .insert({
+            user_id: currentUser.id,
+            video_id: video.id
+          });
+          
+        if (error) {
+          toast.error('Failed to like video');
+          console.error('Like error:', error);
+          return;
+        }
+        
+        setIsLiked(true);
+        setVideo({
+          ...video,
+          likes: video.likes + 1
+        });
+        toast.success('Added like');
+      }
     }, 'like this video');
   };
 
   const handleComment = () => {
     if (!commentText.trim()) return;
     
-    handleAuthAction(() => {
+    handleAuthAction(async () => {
+      if (!video || !currentUser) return;
+      
+      // Submit comment to database
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          user_id: currentUser.id,
+          video_id: video.id,
+          content: commentText
+        })
+        .select('id, created_at')
+        .single();
+        
+      if (error) {
+        toast.error('Failed to post comment');
+        console.error('Comment error:', error);
+        return;
+      }
+      
+      // Add new comment to state
       const newComment = {
-        id: Date.now().toString(),
-        user: { username: '@current_user' },
-        content: commentText
+        id: data.id,
+        user: { 
+          username: currentUser.username,
+          avatar: undefined
+        },
+        content: commentText,
+        created_at: data.created_at
       };
       
-      setComments([...comments, newComment]);
+      setComments([newComment, ...comments]);
       setCommentText('');
+      
+      // Update comment count in video
+      if (video) {
+        setVideo({
+          ...video,
+          comments: video.comments + 1
+        });
+      }
+      
       toast.success('Comment added successfully');
     }, 'comment');
   };
@@ -150,12 +348,21 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     const now = new Date();
     const past = new Date(date);
     const diffInMs = now.getTime() - past.getTime();
-    const diffInMonths = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 30));
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    const diffInMonths = Math.floor(diffInDays / 30);
     
     if (diffInMonths > 0) {
       return `${diffInMonths} ${diffInMonths === 1 ? 'month' : 'months'} ago`;
+    } else if (diffInDays > 0) {
+      return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
+    } else if (diffInHours > 0) {
+      return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+    } else if (diffInMinutes > 0) {
+      return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
     } else {
-      return 'This month';
+      return 'Just now';
     }
   };
 
@@ -198,7 +405,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                   </Avatar>
                   <div>
                     <p className="font-medium">{video.creator.username}</p>
-                    <p className="text-sm text-gray-500">100K Subscribers</p>
+                    <p className="text-sm text-gray-500">{video.creator.subscribers.toLocaleString()} Subscribers</p>
                   </div>
                 </div>
                 
@@ -273,7 +480,10 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium">{comment.user.username}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{comment.user.username}</p>
+                        <span className="text-xs text-gray-500">{getTimeDifference(comment.created_at)}</span>
+                      </div>
                       <p className="text-sm">{comment.content}</p>
                       <div className="flex items-center space-x-2 mt-1">
                         <button className="text-gray-500 hover:text-gray-700">
