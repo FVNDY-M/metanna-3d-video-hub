@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import UploadModal from './UploadModal';
+import VideoModal from './VideoModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -15,10 +17,11 @@ interface PageLayoutProps {
   } | null;
 }
 
-// Make TypeScript recognize the window.openUploadModal property
+// Make TypeScript recognize the window properties
 declare global {
   interface Window {
     openUploadModal?: () => void;
+    openVideoModal?: (videoId: string) => void;
   }
 }
 
@@ -28,6 +31,8 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   user = null
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{
     username: string;
     avatar?: string;
@@ -58,11 +63,23 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     setIsUploadModalOpen(false);
   };
 
-  // Make the openUploadModal function available globally
+  const openVideoModal = (videoId: string) => {
+    setSelectedVideoId(videoId);
+    setIsVideoModalOpen(true);
+  };
+
+  const closeVideoModal = () => {
+    setIsVideoModalOpen(false);
+    setSelectedVideoId(null);
+  };
+
+  // Make the modal functions available globally
   React.useEffect(() => {
     window.openUploadModal = openUploadModal;
+    window.openVideoModal = openVideoModal;
     return () => {
       delete window.openUploadModal;
+      delete window.openVideoModal;
     };
   }, []);
 
@@ -86,6 +103,12 @@ const PageLayout: React.FC<PageLayoutProps> = ({
         isOpen={isUploadModalOpen} 
         onClose={closeUploadModal}
         user={currentUser}
+      />
+
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={closeVideoModal}
+        videoId={selectedVideoId}
       />
     </div>
   );

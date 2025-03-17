@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { Heart, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -8,6 +7,7 @@ export interface VideoData {
   id: string;
   title: string;
   thumbnail: string;
+  videoUrl?: string;
   creator: {
     username: string;
     avatar?: string;
@@ -44,9 +44,19 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
     }
   };
 
+  const handleVideoClick = () => {
+    // Use the global function to open the video modal
+    if (window.openVideoModal) {
+      window.openVideoModal(video.id);
+    }
+  };
+
   return (
     <div className={`video-card group w-full ${className}`}>
-      <Link to={`/video/${video.id}`} className="block w-full rounded-xl overflow-hidden">
+      <div 
+        className="block w-full rounded-xl overflow-hidden cursor-pointer" 
+        onClick={handleVideoClick}
+      >
         <div className="relative aspect-video">
           <img 
             src={video.thumbnail || '/placeholder.svg'} 
@@ -60,7 +70,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
-      </Link>
+      </div>
       
       <div className="flex items-center mt-3 space-x-3">
         <Avatar className="h-8 w-8">
@@ -71,11 +81,14 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
         </Avatar>
         
         <div className="flex-1 min-w-0">
-          <Link to={`/video/${video.id}`} className="block">
+          <div 
+            className="block cursor-pointer"
+            onClick={handleVideoClick}
+          >
             <h3 className="text-sm font-medium text-gray-900 truncate hover:text-indigo-600 transition-colors">
               {video.title}
             </h3>
-          </Link>
+          </div>
           
           <div className="flex items-center text-xs text-gray-500 mt-1 space-x-3">
             <span>{video.creator.username}</span>
