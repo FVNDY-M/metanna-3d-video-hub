@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { 
   Dialog, 
@@ -35,7 +34,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
       
       setLoading(true);
       try {
-        // Fetch video details
         const { data: videoData, error } = await supabase
           .from('videos')
           .select(`
@@ -53,14 +51,12 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         if (error) throw error;
 
         if (videoData) {
-          // Fetch user profile for the video
           const { data: profileData } = await supabase
             .from('profiles')
             .select('username, avatar_url')
             .eq('id', videoData.user_id)
             .single();
 
-          // For demo purposes - generate random likes and comments
           const randomLikes = Math.floor(Math.random() * 2000);
           const randomComments = Math.floor(Math.random() * 100);
 
@@ -79,14 +75,12 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             createdAt: videoData.created_at,
           });
 
-          // Mock comments for demonstration
           setComments([
             {
               id: '1',
               user: { username: '@user1', avatar: undefined },
               content: 'Amazing environment!'
             },
-            // You could add more mock comments here
           ]);
         }
       } catch (error) {
@@ -102,7 +96,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     }
   }, [isOpen, videoId]);
 
-  // Check if user is authenticated
   const checkAuth = async () => {
     const { data } = await supabase.auth.getSession();
     return !!data.session;
@@ -125,7 +118,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
 
   const handleSubscribe = () => {
     handleAuthAction(() => {
-      // Subscription logic would go here
       setIsSubscribed(!isSubscribed);
       toast.success(isSubscribed ? 'Unsubscribed successfully' : 'Subscribed successfully');
     }, 'subscribe');
@@ -133,7 +125,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
 
   const handleLike = () => {
     handleAuthAction(() => {
-      // Like logic would go here
       setIsLiked(!isLiked);
       toast.success(isLiked ? 'Removed like' : 'Added like');
     }, 'like this video');
@@ -143,7 +134,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     if (!commentText.trim()) return;
     
     handleAuthAction(() => {
-      // Comment submission logic would go here
       const newComment = {
         id: Date.now().toString(),
         user: { username: '@current_user' },
@@ -156,7 +146,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     }, 'comment');
   };
 
-  // Calculate time difference for display
   const getTimeDifference = (date: Date | string) => {
     const now = new Date();
     const past = new Date(date);
@@ -181,7 +170,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
           </div>
         ) : video ? (
           <div className="flex flex-col">
-            {/* Video thumbnail with play button overlay */}
             <div className="relative w-full aspect-video bg-black">
               <img 
                 src={video.thumbnail || '/lovable-uploads/659cb0e4-1b73-4666-85b1-c58cf66580db.png'} 
@@ -197,7 +185,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
               </div>
             </div>
             
-            {/* Video info section */}
             <div className="p-4">
               <h2 className="text-xl font-bold mb-2">{video.title}</h2>
               
@@ -227,7 +214,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                 </Button>
               </div>
               
-              {/* Video stats */}
               <div className="flex items-center justify-between text-sm text-gray-600 mb-6">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center">
@@ -251,11 +237,9 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                 <span>{getTimeDifference(video.createdAt)}</span>
               </div>
               
-              {/* Comments section */}
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-3">Comments</h3>
                 
-                {/* Add comment */}
                 <div className="flex items-start space-x-3 mb-6">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-gray-200">U</AvatarFallback>
@@ -283,7 +267,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                 {comments.map(comment => (
                   <div key={comment.id} className="flex space-x-3 mb-3">
                     <Avatar className="h-8 w-8">
-                      <AvatImage src={comment.user.avatar} alt={comment.user.username} />
+                      <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
                       <AvatarFallback className="bg-gray-200">
                         {comment.user.username.charAt(1).toUpperCase()}
                       </AvatarFallback>
