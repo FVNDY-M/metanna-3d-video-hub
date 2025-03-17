@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
@@ -62,7 +61,6 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   // Make the openUploadModal function available globally
   React.useEffect(() => {
     window.openUploadModal = openUploadModal;
-    
     return () => {
       delete window.openUploadModal;
     };
@@ -71,11 +69,15 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar user={currentUser} onUploadClick={openUploadModal} />
-      
+
       <div className="flex flex-1">
-        {showSidebar && <Sidebar className="fixed z-10" />}
-        
-        <main className={`flex-1 ${showSidebar ? 'ml-0 md:ml-56' : ''} animate-fade-in`}>
+        {showSidebar && (
+          <div className="hidden md:block md:w-56 sticky top-0 h-screen">
+            <Sidebar />
+          </div>
+        )}
+
+        <main className="flex-1 w-full max-w-screen-xl mx-auto p-6">
           {children}
         </main>
       </div>
