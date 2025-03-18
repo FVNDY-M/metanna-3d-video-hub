@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
@@ -12,8 +13,10 @@ interface IndexProps {
 
 const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
   const [videos, setVideos] = useState<VideoData[]>([]);
+  const [trendingVideos, setTrendingVideos] = useState<VideoData[]>([]);
   const [subscriptionVideos, setSubscriptionVideos] = useState<VideoData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trendingLoading, setTrendingLoading] = useState(true);
   const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState(filter);
@@ -82,6 +85,69 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
       console.error('Error fetching videos:', error);
       toast.error('Failed to load videos');
       setLoading(false);
+    }
+  };
+
+  const fetchTrendingVideos = async () => {
+    setTrendingLoading(true);
+    try {
+      const { data: videosData, error } = await supabase
+        .from('videos')
+        .select(`
+          id,
+          title,
+          thumbnail_url,
+          created_at,
+          user_id,
+          views,
+          likes_count,
+          comments_count,
+          category
+        `)
+        .eq('visibility', 'public')
+        .order('views', { ascending: false })
+        .limit(12);
+
+      if (error) {
+        throw error;
+      }
+
+      if (videosData) {
+        const videosWithCreators = await Promise.all(
+          videosData.map(async (video) => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('username, avatar_url, subscriber_count')
+              .eq('id', video.user_id)
+              .single();
+
+            return {
+              id: video.id,
+              title: video.title,
+              thumbnail: video.thumbnail_url,
+              category: video.category,
+              creator: {
+                id: video.user_id,
+                username: profileData?.username || 'Unknown Creator',
+                avatar: profileData?.avatar_url,
+                subscribers: profileData?.subscriber_count || 0
+              },
+              likes: video.likes_count || 0,
+              comments: video.comments_count || 0,
+              immersions: video.views || 0,
+              createdAt: video.created_at,
+            };
+          })
+        );
+
+        setTrendingVideos(videosWithCreators);
+      }
+      
+      setTrendingLoading(false);
+    } catch (error) {
+      console.error('Error fetching trending videos:', error);
+      toast.error('Failed to load trending videos');
+      setTrendingLoading(false);
     }
   };
 
@@ -191,8 +257,16 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
   }, []);
   
   useEffect(() => {
-    fetchExploreVideos();
-  }, []);
+    if (activeTab === 'explore' || filter === 'explore') {
+      fetchExploreVideos();
+    }
+  }, [activeTab, filter]);
+  
+  useEffect(() => {
+    if (activeTab === 'trending' || filter === 'trending') {
+      fetchTrendingVideos();
+    }
+  }, [activeTab, filter]);
   
   useEffect(() => {
     if (currentUser) {
@@ -210,7 +284,7 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           <TabsList className="mb-4">
             <TabsTrigger value="home">Home</TabsTrigger>
             <TabsTrigger value="explore">Explore</TabsTrigger>
-            {filter === "trending" && <TabsTrigger value="trending">Trending</TabsTrigger>}
+            {(filter === "trending" || activeTab === "trending") && <TabsTrigger value="trending">Trending</TabsTrigger>}
           </TabsList>
           
           <TabsContent value="home">
@@ -257,15 +331,15 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
             )}
           </TabsContent>
           
-          {filter === "trending" && (
+          {(filter === "trending" || activeTab === "trending") && (
             <TabsContent value="trending">
-              {loading ? (
+              {trendingLoading ? (
                 <div className="flex justify-center items-center py-20">
                   <div className="loader"></div>
                 </div>
-              ) : videos.length > 0 ? (
+              ) : trendingVideos.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                  {videos.map((video) => (
+                  {trendingVideos.map((video) => (
                     <VideoCard key={video.id} video={video} />
                   ))}
                 </div>
