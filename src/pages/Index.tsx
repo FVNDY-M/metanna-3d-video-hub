@@ -274,11 +274,11 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           <TabsHeader>
             <h1 className="text-2xl font-semibold text-gray-900 mb-4">Discover AR Experiences</h1>
           </TabsHeader>
-          <TabsList className="mb-4">
+          {/* <TabsList className="mb-4">
             <TabsTrigger value="home">Home</TabsTrigger>
             <TabsTrigger value="explore">Explore</TabsTrigger>
             <TabsTrigger value="trending">Trending</TabsTrigger>
-          </TabsList>
+          </TabsList> */}
           
           <TabsContent value="home">
             {currentUser ? (
