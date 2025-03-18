@@ -37,6 +37,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     username: string;
     avatar?: string;
   } | null>(user);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(
+    localStorage.getItem('sidebar-collapsed') === 'true'
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -131,6 +134,12 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     setSelectedVideoId(null);
   };
 
+  const toggleSidebar = () => {
+    const newState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(newState);
+    localStorage.setItem('sidebar-collapsed', newState.toString());
+  };
+
   // Make the modal functions available globally
   React.useEffect(() => {
     window.openUploadModal = openUploadModal;
@@ -143,16 +152,18 @@ const PageLayout: React.FC<PageLayoutProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar user={currentUser} onUploadClick={openUploadModal} />
+      <Navbar 
+        user={currentUser} 
+        onUploadClick={openUploadModal} 
+        onMenuClick={toggleSidebar}
+      />
 
       <div className="flex flex-1">
         {showSidebar && (
-          <div className="hidden md:block md:w-56 sticky top-0 h-screen">
-            <Sidebar />
-          </div>
+          <Sidebar isCollapsed={isSidebarCollapsed} />
         )}
 
-        <main className="flex-1 w-full max-w-screen-xl mx-auto p-6">
+        <main className={`flex-1 w-full max-w-screen-xl mx-auto p-6 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
           {children}
         </main>
       </div>
