@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -169,19 +170,15 @@ const VideoDetail = () => {
           
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center">
-              <Link to={`/creator/${video.creator.username}`}>
-                <Avatar className="h-10 w-10 mr-3 hover:ring-2 hover:ring-metanna-blue transition-all">
-                  <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
-                  <AvatarFallback className="bg-metanna-blue text-white">
-                    {video.creator.username.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
+              <Avatar className="h-10 w-10 mr-3">
+                <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
+                <AvatarFallback className="bg-metanna-blue text-white">
+                  {video.creator.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               
               <div>
-                <Link to={`/creator/${video.creator.username}`} className="hover:text-metanna-blue transition-colors">
-                  <h3 className="font-medium text-gray-900">{video.creator.username}</h3>
-                </Link>
+                <h3 className="font-medium text-gray-900">{video.creator.username}</h3>
                 <p className="text-sm text-gray-500">{video.immersions.toLocaleString()} immersions</p>
               </div>
               
@@ -264,20 +261,16 @@ const VideoDetail = () => {
           <div className="space-y-4">
             {comments.map((comment) => (
               <div key={comment.id} className="flex space-x-3 animate-fade-in">
-                <Link to={`/creator/${comment.user.username}`}>
-                  <Avatar className="h-8 w-8 hover:ring-2 hover:ring-metanna-blue transition-all">
-                    <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
-                    <AvatarFallback className="bg-metanna-blue text-white">
-                      {comment.user.username.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </Link>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
+                  <AvatarFallback className="bg-metanna-blue text-white">
+                    {comment.user.username.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
-                    <Link to={`/creator/${comment.user.username}`} className="hover:text-metanna-blue transition-colors">
-                      <h4 className="font-medium text-gray-900">{comment.user.username}</h4>
-                    </Link>
+                    <h4 className="font-medium text-gray-900">{comment.user.username}</h4>
                     <span className="text-xs text-gray-500">{formatRelativeTime(comment.createdAt)}</span>
                   </div>
                   

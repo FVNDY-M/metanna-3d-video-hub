@@ -14,8 +14,6 @@ import SearchResults from "./pages/SearchResults";
 import WatchLater from "./pages/WatchLater";
 import LikedVideos from "./pages/LikedVideos";
 import YourVideos from "./pages/YourVideos";
-import UserProfile from "./pages/UserProfile";
-import EditProfile from "./pages/EditProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -59,15 +57,7 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
-          <Route path="/creator/:username" element={<UserProfile />} />
-          <Route 
-            path="/edit-profile" 
-            element={
-              <ProtectedRoute>
-                <EditProfile />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/creator/:username" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
