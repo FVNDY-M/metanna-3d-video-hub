@@ -8,8 +8,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger, TabsHeader } from '@/components/ui/tabs';
 
+// Define a type for the filter values
+type FilterType = 'trending' | 'explore' | 'creator' | 'home';
+
 interface IndexProps {
-  filter?: 'trending' | 'explore' | 'creator';
+  filter?: FilterType;
 }
 
 const Index: React.FC<IndexProps> = ({ filter }) => {
@@ -18,7 +21,7 @@ const Index: React.FC<IndexProps> = ({ filter }) => {
   const [loading, setLoading] = useState(true);
   const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState(filter || 'explore');
+  const [activeTab, setActiveTab] = useState<FilterType>(filter || 'explore');
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
   const { id: creatorId } = useParams<{ id: string }>();
 
@@ -220,10 +223,16 @@ const Index: React.FC<IndexProps> = ({ filter }) => {
     }
   }, [currentUser]);
 
+  // Handler for tab change that ensures type safety
+  const handleTabChange = (value: string) => {
+    // This cast is safe because we control the possible values in the UI
+    setActiveTab(value as FilterType);
+  };
+
   return (
     <PageLayout user={user}>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsHeader>
             <h1 className="text-2xl font-semibold text-gray-900 mb-4">
               {filter === 'creator' ? 'Creator Videos' : 
