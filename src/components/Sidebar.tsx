@@ -144,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                     </Avatar>
                   </span>
                   <span>{creator.username}</span>
-                  <span className="ml-auto text-xs text-gray-500">{creator.subscriber_count}</span>
+                  {/* <span className="ml-auto text-xs text-gray-500">{creator.subscriber_count}</span> */}
                 </NavLink>
               ))
             )}
