@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
@@ -8,29 +7,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger, TabsHeader } from '@/components/ui/tabs';
 
-// Define a type for the filter values
-type FilterType = 'trending' | 'explore' | 'creator' | 'home';
-
-interface IndexProps {
-  filter?: FilterType;
-}
-
-const Index: React.FC<IndexProps> = ({ filter }) => {
+const Index = () => {
   const [videos, setVideos] = useState<VideoData[]>([]);
   const [subscriptionVideos, setSubscriptionVideos] = useState<VideoData[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState<FilterType>(filter || 'explore');
+  const [activeTab, setActiveTab] = useState('explore');
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
-  const { id: creatorId } = useParams<{ id: string }>();
 
   // Fetch videos for the Explore section (all public videos)
   const fetchExploreVideos = async () => {
     setLoading(true);
     try {
       // Fetch videos from Supabase
-      let query = supabase
+      const { data: videosData, error } = await supabase
         .from('videos')
         .select(`
           id,
@@ -45,18 +36,6 @@ const Index: React.FC<IndexProps> = ({ filter }) => {
         `)
         .eq('visibility', 'public')
         .order('created_at', { ascending: false });
-      
-      // If viewing a specific creator's videos
-      if (filter === 'creator' && creatorId) {
-        query = query.eq('user_id', creatorId);
-      }
-      
-      // If viewing trending videos
-      if (filter === 'trending') {
-        query = query.order('views', { ascending: false });
-      }
-
-      const { data: videosData, error } = await query;
 
       if (error) {
         throw error;
@@ -67,7 +46,7 @@ const Index: React.FC<IndexProps> = ({ filter }) => {
         const videosWithCreators = await Promise.all(
           videosData.map(async (video) => {
             // Fetch user profile data for each video
-            const { data: profileData, error: profileError } = await supabase
+            const { data: profileData } = await supabase
               .from('profiles')
               .select('username, avatar_url, subscriber_count')
               .eq('id', video.user_id)
@@ -152,7 +131,7 @@ const Index: React.FC<IndexProps> = ({ filter }) => {
       if (videosData) {
         const videosWithCreators = await Promise.all(
           videosData.map(async (video) => {
-            const { data: profileData, error: profileError } = await supabase
+            const { data: profileData } = await supabase
               .from('profiles')
               .select('username, avatar_url, subscriber_count')
               .eq('id', video.user_id)
@@ -215,7 +194,7 @@ const Index: React.FC<IndexProps> = ({ filter }) => {
   
   useEffect(() => {
     fetchExploreVideos();
-  }, [filter, creatorId]);
+  }, []);
   
   useEffect(() => {
     if (currentUser) {
@@ -223,100 +202,61 @@ const Index: React.FC<IndexProps> = ({ filter }) => {
     }
   }, [currentUser]);
 
-  // Handler for tab change that ensures type safety
-  const handleTabChange = (value: string) => {
-    // This cast is safe because we control the possible values in the UI
-    setActiveTab(value as FilterType);
-  };
-
   return (
     <PageLayout user={user}>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsHeader>
-            <h1 className="text-2xl font-semibold text-gray-900 mb-4">
-              {filter === 'creator' ? 'Creator Videos' : 
-               filter === 'trending' ? 'Trending Videos' : 
-               'Discover AR Experiences'}
-            </h1>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-4">Discover AR Experiences</h1>
           </TabsHeader>
+          <TabsList className="mb-4">
+            <TabsTrigger value="home">Home</TabsTrigger>
+            <TabsTrigger value="explore">Explore</TabsTrigger>
+          </TabsList>
           
-          {!filter && (
-            <TabsList className="mb-4">
-              <TabsTrigger value="home">Home</TabsTrigger>
-              <TabsTrigger value="explore">Explore</TabsTrigger>
-            </TabsList>
-          )}
-          
-          {!filter && (
-            <>
-              <TabsContent value="home">
-                {currentUser ? (
-                  subscriptionsLoading ? (
-                    <div className="flex justify-center items-center py-20">
-                      <div className="loader"></div>
-                    </div>
-                  ) : subscriptionVideos.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                      {subscriptionVideos.map((video) => (
-                        <VideoCard key={video.id} video={video} />
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState 
-                      title="No subscription videos found" 
-                      description="Videos from channels you subscribe to will appear here. Start by subscribing to some channels." 
-                      icon="🎬" 
-                    />
-                  )
-                ) : (
-                  <EmptyState 
-                    title="Sign in to see personalized content" 
-                    description="Log in to see videos from channels you subscribe to." 
-                    icon="🔒" 
-                  />
-                )}
-              </TabsContent>
-              
-              <TabsContent value="explore">
-                {loading ? (
-                  <div className="flex justify-center items-center py-20">
-                    <div className="loader"></div>
-                  </div>
-                ) : videos.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                    {videos.map((video) => (
-                      <VideoCard key={video.id} video={video} />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState />
-                )}
-              </TabsContent>
-            </>
-          )}
-          
-          {filter && (
-            <div className="mt-4">
-              {loading ? (
+          <TabsContent value="home">
+            {currentUser ? (
+              subscriptionsLoading ? (
                 <div className="flex justify-center items-center py-20">
                   <div className="loader"></div>
                 </div>
-              ) : videos.length > 0 ? (
+              ) : subscriptionVideos.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                  {videos.map((video) => (
+                  {subscriptionVideos.map((video) => (
                     <VideoCard key={video.id} video={video} />
                   ))}
                 </div>
               ) : (
                 <EmptyState 
-                  title={filter === 'creator' ? 'No videos from this creator' : 'No videos found'} 
-                  description={filter === 'creator' ? 'This creator hasn\'t uploaded any videos yet.' : 'Check back later for more content.'} 
+                  title="No subscription videos found" 
+                  description="Videos from channels you subscribe to will appear here. Start by subscribing to some channels." 
                   icon="🎬" 
                 />
-              )}
-            </div>
-          )}
+              )
+            ) : (
+              <EmptyState 
+                title="Sign in to see personalized content" 
+                description="Log in to see videos from channels you subscribe to." 
+                icon="🔒" 
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="explore">
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="loader"></div>
+              </div>
+            ) : videos.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                {videos.map((video) => (
+                  <VideoCard key={video.id} video={video} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState />
+            )}
+          </TabsContent>
         </Tabs>
       </div>
     </PageLayout>
