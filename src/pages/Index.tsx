@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
@@ -7,20 +6,26 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger, TabsHeader } from '@/components/ui/tabs';
 
-const Index = () => {
+interface IndexProps {
+  filter?: string;
+}
+
+const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
   const [videos, setVideos] = useState<VideoData[]>([]);
   const [subscriptionVideos, setSubscriptionVideos] = useState<VideoData[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('explore');
+  const [activeTab, setActiveTab] = useState(filter);
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
 
-  // Fetch videos for the Explore section (all public videos)
+  useEffect(() => {
+    setActiveTab(filter);
+  }, [filter]);
+
   const fetchExploreVideos = async () => {
     setLoading(true);
     try {
-      // Fetch videos from Supabase
       const { data: videosData, error } = await supabase
         .from('videos')
         .select(`
@@ -41,11 +46,9 @@ const Index = () => {
         throw error;
       }
 
-      // For each video, fetch the creator information
       if (videosData) {
         const videosWithCreators = await Promise.all(
           videosData.map(async (video) => {
-            // Fetch user profile data for each video
             const { data: profileData } = await supabase
               .from('profiles')
               .select('username, avatar_url, subscriber_count')
@@ -82,7 +85,6 @@ const Index = () => {
     }
   };
 
-  // Fetch videos from subscribed channels for the Home section
   const fetchSubscriptionVideos = async () => {
     if (!currentUser) {
       setSubscriptionsLoading(false);
@@ -91,7 +93,6 @@ const Index = () => {
     
     setSubscriptionsLoading(true);
     try {
-      // First get all the creators the user is subscribed to
       const { data: subscriptions, error: subError } = await supabase
         .from('subscriptions')
         .select('creator_id')
@@ -105,10 +106,8 @@ const Index = () => {
         return;
       }
       
-      // Get the creator IDs
       const creatorIds = subscriptions.map(sub => sub.creator_id);
       
-      // Fetch videos from these creators
       const { data: videosData, error } = await supabase
         .from('videos')
         .select(`
@@ -168,7 +167,6 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Check if user is logged in
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
@@ -212,6 +210,7 @@ const Index = () => {
           <TabsList className="mb-4">
             <TabsTrigger value="home">Home</TabsTrigger>
             <TabsTrigger value="explore">Explore</TabsTrigger>
+            {filter === "trending" && <TabsTrigger value="trending">Trending</TabsTrigger>}
           </TabsList>
           
           <TabsContent value="home">
@@ -257,6 +256,24 @@ const Index = () => {
               <EmptyState />
             )}
           </TabsContent>
+          
+          {filter === "trending" && (
+            <TabsContent value="trending">
+              {loading ? (
+                <div className="flex justify-center items-center py-20">
+                  <div className="loader"></div>
+                </div>
+              ) : videos.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                  {videos.map((video) => (
+                    <VideoCard key={video.id} video={video} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="No trending videos found" description="Check back later for trending content" icon="🔥" />
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </PageLayout>
