@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Heart, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,6 +17,7 @@ export interface VideoData {
   comments: number;
   immersions: number;
   createdAt: Date | string;
+  visibility?: 'public' | 'private';
 }
 
 interface VideoCardProps {
