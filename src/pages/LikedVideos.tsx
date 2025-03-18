@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
-import { EmptyState } from '@/components/EmptyState';
+import EmptyState from '@/components/EmptyState';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 const LikedVideos = () => {
@@ -19,63 +19,63 @@ const LikedVideos = () => {
       
       setUserId(session.user.id);
       
-      // Fetch liked videos from likes table
-      const { data, error } = await supabase
+      // Fetch video IDs from likes table
+      const { data: likesData, error: likesError } = await supabase
         .from('likes')
-        .select(`
-          created_at,
-          videos(
-            id,
-            title,
-            thumbnail_url,
-            likes_count,
-            comments_count,
-            views,
-            created_at,
-            user_id
-          )
-        `)
+        .select('video_id, created_at')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching liked videos:', error);
+      if (likesError) {
+        console.error('Error fetching liked videos:', likesError);
         setLoading(false);
         return;
       }
 
-      if (data) {
-        // Get creator information for each video
-        const videoPromises = data.map(async (item) => {
-          const video = item.videos;
-          
-          if (!video) return null;
-          
-          const { data: creatorData } = await supabase
-            .from('profiles')
-            .select('username, avatar_url, subscriber_count')
-            .eq('id', video.user_id)
-            .single();
-            
-          return {
-            id: video.id,
-            title: video.title,
-            thumbnail: video.thumbnail_url || '',
-            creator: {
-              id: video.user_id,
-              username: creatorData?.username || 'Unknown Creator',
-              avatar: creatorData?.avatar_url || undefined,
-              subscribers: creatorData?.subscriber_count || 0
-            },
-            likes: video.likes_count,
-            comments: video.comments_count,
-            immersions: video.views,
-            createdAt: video.created_at
-          } as VideoData;
-        });
+      if (likesData && likesData.length > 0) {
+        // Fetch actual video data for each liked video
+        const videoIds = likesData.map(item => item.video_id);
         
-        const videosData = await Promise.all(videoPromises);
-        setLikedVideos(videosData.filter(v => v !== null) as VideoData[]);
+        const { data: videosData, error: videosError } = await supabase
+          .from('videos')
+          .select('*')
+          .in('id', videoIds);
+
+        if (videosError) {
+          console.error('Error fetching videos:', videosError);
+          setLoading(false);
+          return;
+        }
+
+        if (videosData) {
+          // Get creator information for each video
+          const videoPromises = videosData.map(async (video) => {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('username, avatar_url, subscriber_count')
+              .eq('id', video.user_id)
+              .single();
+              
+            return {
+              id: video.id,
+              title: video.title,
+              thumbnail: video.thumbnail_url || '',
+              creator: {
+                id: video.user_id,
+                username: creatorData?.username || 'Unknown Creator',
+                avatar: creatorData?.avatar_url || undefined,
+                subscribers: creatorData?.subscriber_count || 0
+              },
+              likes: video.likes_count,
+              comments: video.comments_count,
+              immersions: video.views,
+              createdAt: video.created_at
+            } as VideoData;
+          });
+          
+          const processedVideos = await Promise.all(videoPromises);
+          setLikedVideos(processedVideos.filter(v => v !== null) as VideoData[]);
+        }
       }
       
       setLoading(false);

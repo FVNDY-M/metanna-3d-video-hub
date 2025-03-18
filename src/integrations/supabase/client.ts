@@ -15,11 +15,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 export const incrementVideoView = async (videoId: string, userId?: string) => {
   if (!videoId) return;
 
-  // Update video views count
-  const { error } = await supabase
-    .from('videos')
-    .update({ views: supabase.rpc('increment_count', { row_id: videoId }) })
-    .eq('id', videoId);
+  // Update video views count using RPC function
+  const { error } = await supabase.rpc('increment_count', { row_id: videoId });
 
   if (error) {
     console.error('Error incrementing view count:', error);

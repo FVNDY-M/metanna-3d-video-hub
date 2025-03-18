@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
-import { EmptyState } from '@/components/EmptyState';
+import EmptyState from '@/components/EmptyState';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 const WatchLater = () => {
@@ -19,65 +19,64 @@ const WatchLater = () => {
       
       setUserId(session.user.id);
       
-      // Fetch watch history from watch_history table
-      const { data, error } = await supabase
+      // Fetch videos from watch history
+      const { data: historyData, error: historyError } = await supabase
         .from('watch_history')
-        .select(`
-          video_id,
-          watched_at,
-          videos(
-            id,
-            title,
-            thumbnail_url,
-            likes_count,
-            comments_count,
-            views,
-            created_at,
-            user_id
-          )
-        `)
+        .select('video_id, watched_at')
         .eq('user_id', session.user.id)
         .order('watched_at', { ascending: false })
         .limit(20);
 
-      if (error) {
-        console.error('Error fetching watch history:', error);
+      if (historyError) {
+        console.error('Error fetching watch history:', historyError);
         setLoading(false);
         return;
       }
 
-      if (data) {
-        // Get creator information for each video
-        const videoPromises = data.map(async (item) => {
-          const video = item.videos;
-          
-          if (!video) return null;
-          
-          const { data: creatorData } = await supabase
-            .from('profiles')
-            .select('username, avatar_url, subscriber_count')
-            .eq('id', video.user_id)
-            .single();
-            
-          return {
-            id: video.id,
-            title: video.title,
-            thumbnail: video.thumbnail_url || '',
-            creator: {
-              id: video.user_id,
-              username: creatorData?.username || 'Unknown Creator',
-              avatar: creatorData?.avatar_url || undefined,
-              subscribers: creatorData?.subscriber_count || 0
-            },
-            likes: video.likes_count,
-            comments: video.comments_count,
-            immersions: video.views,
-            createdAt: video.created_at
-          } as VideoData;
-        });
+      if (historyData && historyData.length > 0) {
+        // Fetch actual video data for each video in watch history
+        const videoIds = historyData.map(item => item.video_id);
         
-        const videosData = await Promise.all(videoPromises);
-        setWatchHistory(videosData.filter(v => v !== null) as VideoData[]);
+        const { data: videosData, error: videosError } = await supabase
+          .from('videos')
+          .select('*')
+          .in('id', videoIds);
+
+        if (videosError) {
+          console.error('Error fetching videos:', videosError);
+          setLoading(false);
+          return;
+        }
+
+        if (videosData) {
+          // Get creator information for each video
+          const videoPromises = videosData.map(async (video) => {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('username, avatar_url, subscriber_count')
+              .eq('id', video.user_id)
+              .single();
+              
+            return {
+              id: video.id,
+              title: video.title,
+              thumbnail: video.thumbnail_url || '',
+              creator: {
+                id: video.user_id,
+                username: creatorData?.username || 'Unknown Creator',
+                avatar: creatorData?.avatar_url || undefined,
+                subscribers: creatorData?.subscriber_count || 0
+              },
+              likes: video.likes_count,
+              comments: video.comments_count,
+              immersions: video.views,
+              createdAt: video.created_at
+            } as VideoData;
+          });
+          
+          const processedVideos = await Promise.all(videoPromises);
+          setWatchHistory(processedVideos.filter(v => v !== null) as VideoData[]);
+        }
       }
       
       setLoading(false);
@@ -86,13 +85,11 @@ const WatchLater = () => {
     fetchUserAndWatchHistory();
   }, []);
 
-  // Create watch_history table in SQL file
-
   return (
     <PageLayout>
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Watch Later</CardTitle>
+          <CardTitle className="text-2xl font-bold">Watch History</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
