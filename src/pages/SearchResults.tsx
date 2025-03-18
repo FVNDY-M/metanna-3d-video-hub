@@ -39,7 +39,7 @@ const SearchResults = () => {
           )
         `)
         .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`)
-        .eq('visibility', 'public' as 'public' | 'private')
+        .eq('visibility', 'public')
         .order('views', { ascending: false });
       
       if (error) throw error;
@@ -183,7 +183,7 @@ const SearchResults = () => {
                         comments: video.comments_count,
                         immersions: video.views,
                         createdAt: video.created_at,
-                        visibility: video.visibility,
+                        visibility: video.visibility as 'public' | 'private',
                         category: video.category,
                         description: video.description
                       }}

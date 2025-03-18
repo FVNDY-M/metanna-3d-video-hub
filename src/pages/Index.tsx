@@ -206,7 +206,7 @@ const Index = () => {
                   comments: video.comments_count,
                   immersions: video.views,
                   createdAt: video.created_at,
-                  visibility: video.visibility,
+                  visibility: video.visibility as 'public' | 'private',
                   category: video.category,
                   description: video.description
                 }}
