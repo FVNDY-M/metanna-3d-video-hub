@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Dialog, 
@@ -198,17 +197,19 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
   }, [isOpen, videoId, currentUser]);
 
   const handleTimeUpdate = () => {
-    if (videoRef.current && !viewCounted && video) {
+    if (videoRef.current && !viewCounted && videoId) {
       const video = videoRef.current;
       const percentage = (video.currentTime / video.duration) * 100;
       
       // Count view once user has watched 50% of the video
       if (percentage >= 50 && !viewCounted) {
         setViewCounted(true);
+        
+        // Call the incrementVideoView function with correct videoId
         if (currentUser) {
-          incrementVideoView(video.id, currentUser.id);
+          incrementVideoView(videoId, currentUser.id);
         } else {
-          incrementVideoView(video.id);
+          incrementVideoView(videoId);
         }
         
         // Update UI immediately

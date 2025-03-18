@@ -33,8 +33,8 @@ const App = () => (
           <Route path="/video/:id" element={<VideoDetail />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/search" element={<SearchResults />} />
-          <Route path="/trending" element={<Index />} />
-          <Route path="/explore" element={<Index />} />
+          <Route path="/trending" element={<Index filter="trending" />} />
+          <Route path="/explore" element={<Index filter="explore" />} />
           <Route 
             path="/watch-later" 
             element={

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Menu, X, Upload, LogIn, Bell } from 'lucide-react';
@@ -163,13 +164,13 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
                       </div>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link to="/profile" className="cursor-pointer w-full">
+                        <Link to={`/profile/${activeUser.username}`} className="cursor-pointer w-full">
                           Profile
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link to="/settings" className="cursor-pointer w-full">
-                          Settings
+                        <Link to="/edit-profile" className="cursor-pointer w-full">
+                          Edit Profile
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -214,6 +215,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
         </div>
       </div>
 
+      {/* Mobile Menu */}
       <div className={`md:hidden ${mobileMenuOpen ? 'block' : 'hidden'}`}>
         <div className="pt-2 pb-4 px-4 space-y-4 bg-white border-b border-gray-100">
           <form onSubmit={handleSearch} className="relative">
@@ -263,18 +265,18 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
                 Notifications
               </Link>
               <Link
-                to="/profile"
+                to={`/profile/${activeUser.username}`}
                 className="block p-2 rounded-lg text-base font-medium text-metanna-black hover:bg-gray-50"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Profile
               </Link>
               <Link
-                to="/settings"
+                to="/edit-profile"
                 className="block p-2 rounded-lg text-base font-medium text-metanna-black hover:bg-gray-50"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Settings
+                Edit Profile
               </Link>
               <button
                 className="block w-full text-left p-2 rounded-lg text-base font-medium text-destructive hover:bg-gray-50"
