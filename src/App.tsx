@@ -15,6 +15,7 @@ import WatchLater from "./pages/WatchLater";
 import LikedVideos from "./pages/LikedVideos";
 import YourVideos from "./pages/YourVideos";
 import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <YourVideos />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/edit-profile" 
+            element={
+              <ProtectedRoute>
+                <EditProfile />
               </ProtectedRoute>
             } 
           />

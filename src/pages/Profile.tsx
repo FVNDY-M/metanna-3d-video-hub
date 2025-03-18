@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import VideoCard from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
-import { User, Video, Heart } from 'lucide-react';
+import { User, Video, Heart, Pencil } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -34,13 +33,11 @@ const Profile = () => {
       setLoading(true);
       
       try {
-        // Check if current user is logged in
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setCurrentUser(session.user);
         }
         
-        // Fetch profile
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -54,7 +51,6 @@ const Profile = () => {
         if (profiles) {
           setProfile(profiles);
           
-          // Fetch videos by this user
           const { data: userVideos, error: videosError } = await supabase
             .from('videos')
             .select('*')
@@ -85,7 +81,6 @@ const Profile = () => {
             })));
           }
           
-          // Check if current user is subscribed to this creator
           if (session?.user) {
             const { data: subscription, error: subscriptionError } = await supabase
               .from('subscriptions')
@@ -123,7 +118,6 @@ const Profile = () => {
     
     try {
       if (isSubscribed) {
-        // Unsubscribe
         const { error } = await supabase
           .from('subscriptions')
           .delete()
@@ -142,7 +136,6 @@ const Profile = () => {
           description: `You've unsubscribed from ${profile?.username}`
         });
       } else {
-        // Subscribe
         const { error } = await supabase
           .from('subscriptions')
           .insert({ 
@@ -194,7 +187,6 @@ const Profile = () => {
     );
   }
 
-  // Format date as Month Year
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -203,7 +195,6 @@ const Profile = () => {
   return (
     <PageLayout>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Profile Header */}
         <div className="rounded-xl overflow-hidden bg-gray-50 p-6 mb-8">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <Avatar className="h-24 w-24 md:h-32 md:w-32 border-4 border-white shadow-md">
@@ -225,20 +216,31 @@ const Profile = () => {
                 <p className="text-gray-700 mb-4 max-w-xl">{profile.bio}</p>
               )}
               
-              {currentUser?.id !== profile.id && (
-                <Button 
-                  variant={isSubscribed ? "outline" : "default"} 
-                  className={`rounded-full ${isSubscribed ? 'border-metanna-blue text-metanna-blue' : 'bg-metanna-blue text-white'}`}
-                  onClick={handleSubscribe}
-                >
-                  {isSubscribed ? 'Subscribed' : 'Subscribe'}
-                </Button>
-              )}
+              <div className="flex justify-center md:justify-start space-x-4">
+                {currentUser?.id !== profile.id ? (
+                  <Button 
+                    variant={isSubscribed ? "outline" : "default"} 
+                    className={`rounded-full ${isSubscribed ? 'border-metanna-blue text-metanna-blue' : 'bg-metanna-blue text-white'}`}
+                    onClick={handleSubscribe}
+                  >
+                    {isSubscribed ? 'Subscribed' : 'Subscribe'}
+                  </Button>
+                ) : (
+                  <Link to="/edit-profile">
+                    <Button 
+                      variant="outline" 
+                      className="rounded-full border-metanna-blue text-metanna-blue"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
         
-        {/* Content Tabs */}
         <Tabs defaultValue="videos" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="videos">Videos</TabsTrigger>
