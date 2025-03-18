@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -167,7 +166,7 @@ const SearchResults = () => {
             <h3 className="text-lg font-medium mb-1">{user.username}</h3>
             <p className="text-sm text-gray-500 mb-3">{user.subscriber_count} subscribers</p>
             <Button size="sm" variant="outline" className="rounded-full" asChild>
-              <Link to={`/profile/${user.id}`}>View Profile</Link>
+              <Link to={`/profile/${user.username}`}>View Profile</Link>
             </Button>
           </div>
         ))}

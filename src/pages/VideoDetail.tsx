@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -170,15 +169,19 @@ const VideoDetail = () => {
           
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center">
-              <Avatar className="h-10 w-10 mr-3">
-                <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
-                <AvatarFallback className="bg-metanna-blue text-white">
-                  {video.creator.username.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <Link to={`/profile/${video.creator.username}`}>
+                <Avatar className="h-10 w-10 mr-3 cursor-pointer">
+                  <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
+                  <AvatarFallback className="bg-metanna-blue text-white">
+                    {video.creator.username.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
               
               <div>
-                <h3 className="font-medium text-gray-900">{video.creator.username}</h3>
+                <Link to={`/profile/${video.creator.username}`} className="hover:text-metanna-blue transition-colors">
+                  <h3 className="font-medium text-gray-900">{video.creator.username}</h3>
+                </Link>
                 <p className="text-sm text-gray-500">{video.immersions.toLocaleString()} immersions</p>
               </div>
               

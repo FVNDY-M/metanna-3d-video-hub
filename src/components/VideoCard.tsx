@@ -2,6 +2,7 @@
 import React from 'react';
 import { Heart, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Link } from 'react-router-dom';
 
 export interface VideoData {
   id: string;
@@ -78,12 +79,14 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
       </div>
       
       <div className="flex items-center mt-3 space-x-3">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
-          <AvatarFallback className="bg-indigo-600 text-white">
-            {video.creator.username.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <Link to={`/profile/${video.creator.username}`}>
+          <Avatar className="h-8 w-8 cursor-pointer">
+            <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
+            <AvatarFallback className="bg-indigo-600 text-white">
+              {video.creator.username.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
         
         <div className="flex-1 min-w-0">
           <div 
@@ -96,7 +99,9 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
           </div>
           
           <div className="flex items-center text-xs text-gray-500 mt-1 space-x-3">
-            <span>{video.creator.username}</span>
+            <Link to={`/profile/${video.creator.username}`} className="hover:text-metanna-blue">
+              <span>{video.creator.username}</span>
+            </Link>
             <span>·</span>
             <span>{video.immersions.toLocaleString()} immersions</span>
             <span>·</span>
