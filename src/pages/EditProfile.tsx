@@ -8,19 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Save, UploadCloud } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
 
 const profileSchema = z.object({
   username: z.string().min(3, {
     message: "Username must be at least 3 characters",
   }),
   bio: z.string().optional(),
+  avatar_url: z.string().optional(),
   email: z.string().email().optional(),
 });
 
@@ -31,10 +30,6 @@ const EditProfile = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
   // Setup form with default values
   const form = useForm<ProfileFormValues>({
@@ -42,6 +37,7 @@ const EditProfile = () => {
     defaultValues: {
       username: '',
       bio: '',
+      avatar_url: '',
       email: '',
     },
   });
@@ -73,13 +69,11 @@ const EditProfile = () => {
         // Get user email
         const { data: { user } } = await supabase.auth.getUser();
         
-        // Set avatar URL
-        setAvatarUrl(profile.avatar_url);
-        
         // Set form values
         form.reset({
           username: profile.username || '',
           bio: profile.bio || '',
+          avatar_url: profile.avatar_url || '',
           email: user?.email || '',
         });
         
@@ -98,78 +92,19 @@ const EditProfile = () => {
     fetchUserProfile();
   }, [navigate, toast, form]);
   
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) {
-      return;
-    }
-    
-    const file = event.target.files[0];
-    setAvatarFile(file);
-    
-    // Create a preview URL
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    
-    // Clean up preview URL when component unmounts
-    return () => URL.revokeObjectURL(objectUrl);
-  };
-  
-  const uploadAvatar = async (): Promise<string | null> => {
-    if (!avatarFile || !currentUser) return avatarUrl;
-    
-    setUploading(true);
-    
-    try {
-      // Create a unique file name
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `${currentUser.id}/${fileName}`;
-      
-      // Upload the file to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile);
-        
-      if (uploadError) throw uploadError;
-      
-      // Get the public URL
-      const { data: publicUrl } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-        
-      return publicUrl.publicUrl;
-    } catch (error) {
-      console.error('Error uploading avatar:', error);
-      toast({
-        title: "Upload failed",
-        description: "We couldn't upload your avatar. Please try again.",
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setUploading(false);
-    }
-  };
-  
   const onSubmit = async (values: ProfileFormValues) => {
     if (!currentUser) return;
     
     setIsLoading(true);
     
     try {
-      // Upload avatar if a new one was selected
-      let newAvatarUrl = avatarUrl;
-      if (avatarFile) {
-        newAvatarUrl = await uploadAvatar();
-      }
-      
       // Update profile in database
       const { error } = await supabase
         .from('profiles')
         .update({
           username: values.username,
           bio: values.bio,
-          avatar_url: newAvatarUrl,
+          avatar_url: values.avatar_url,
           updated_at: new Date().toISOString(),
         })
         .eq('id', currentUser.id);
@@ -215,32 +150,6 @@ const EditProfile = () => {
             <CardDescription>Update your profile information</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex justify-center mb-6">
-              <div className="relative group">
-                <Avatar className="h-24 w-24 cursor-pointer border-2 border-white shadow-lg">
-                  <AvatarImage 
-                    src={previewUrl || avatarUrl || ''} 
-                    alt="Profile" 
-                  />
-                  <AvatarFallback className="text-xl">
-                    {form.getValues().username ? form.getValues().username.charAt(0).toUpperCase() : '?'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                  <label htmlFor="avatar-upload" className="cursor-pointer text-white p-2">
-                    <UploadCloud className="h-8 w-8" />
-                  </label>
-                  <input
-                    id="avatar-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                  />
-                </div>
-              </div>
-            </div>
-            
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
@@ -278,6 +187,20 @@ const EditProfile = () => {
                 
                 <FormField
                   control={form.control}
+                  name="avatar_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Avatar URL</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://example.com/avatar.jpg" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
@@ -293,10 +216,10 @@ const EditProfile = () => {
                 <div className="flex justify-end">
                   <Button 
                     type="submit" 
-                    disabled={isLoading || uploading}
+                    disabled={isLoading}
                     className="bg-metanna-blue text-white"
                   >
-                    {(isLoading || uploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <Save className="mr-2 h-4 w-4" />
                     Save Changes
                   </Button>
