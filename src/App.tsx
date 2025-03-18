@@ -31,9 +31,8 @@ const App = () => (
           <Route path="/video/:id" element={<VideoDetail />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/search" element={<SearchResults />} />
-          <Route path="/trending" element={<Index filter="trending" />} />
-          <Route path="/explore" element={<Index filter="explore" />} />
-          <Route path="/creator/:id" element={<Index filter="creator" />} />
+          <Route path="/trending" element={<Index />} />
+          <Route path="/explore" element={<Index />} />
           <Route 
             path="/watch-later" 
             element={
@@ -58,6 +57,7 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
+          <Route path="/creator/:username" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

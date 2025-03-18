@@ -1,16 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Home, 
-  TrendingUp, 
-  Compass, 
-  Clock, 
-  Heart, 
-  ListVideo, 
-  User 
-} from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Home, TrendingUp, Compass, Clock, Heart, ListVideo, User } from 'lucide-react';
 
 interface SidebarLink {
   icon: React.ReactNode;
@@ -25,48 +16,10 @@ interface SidebarCategory {
 
 interface SidebarProps {
   className?: string;
-  isCollapsed: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ className = '', isCollapsed }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [popularCreators, setPopularCreators] = useState<{username: string, id: string}[]>([]);
-
-  useEffect(() => {
-    // Check if user is authenticated
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      setIsAuthenticated(!!data.session);
-    };
-
-    // Get popular creators
-    const fetchPopularCreators = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, subscriber_count')
-        .order('subscriber_count', { ascending: false })
-        .limit(5);
-
-      if (!error && data) {
-        setPopularCreators(data);
-      }
-    };
-
-    checkAuth();
-    fetchPopularCreators();
-
-    // Listen for auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      setIsAuthenticated(event === 'SIGNED_IN');
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  // Define categories based on authentication status
-  const publicCategories: SidebarCategory[] = [
+const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
+  const categories: SidebarCategory[] = [
     {
       links: [
         { icon: <Home className="h-5 w-5" />, label: 'Home', href: '/' },
@@ -75,18 +28,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', isCollapsed }) => {
       ],
     },
     {
-      title: 'Popular Creators',
-      links: popularCreators.map(creator => ({
-        icon: <User className="h-5 w-5" />, 
-        label: creator.username, 
-        href: `/creator/${creator.id}`
-      })),
-    },
-  ];
-
-  const authenticatedCategories: SidebarCategory[] = [
-    ...publicCategories,
-    {
       title: 'Your Library',
       links: [
         { icon: <Clock className="h-5 w-5" />, label: 'Watch Later', href: '/watch-later' },
@@ -94,18 +35,23 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', isCollapsed }) => {
         { icon: <ListVideo className="h-5 w-5" />, label: 'Your Videos', href: '/your-videos' },
       ],
     },
+    {
+      title: 'Popular Creators',
+      links: [
+        { icon: <User className="h-5 w-5" />, label: 'Tesla', href: '/creator/tesla' },
+        { icon: <User className="h-5 w-5" />, label: 'Marvel', href: '/creator/marvel' },
+        { icon: <User className="h-5 w-5" />, label: 'Michel Rojkind', href: '/creator/michel-rojkind' },
+        { icon: <User className="h-5 w-5" />, label: 'Caspar David Friedrich', href: '/creator/caspar-david-friedrich' },
+      ],
+    },
   ];
 
-  const categories = isAuthenticated ? authenticatedCategories : publicCategories;
-
   return (
-    <aside 
-      className={`hidden md:block ${isCollapsed ? 'w-16' : 'w-56'} min-w-${isCollapsed ? '16' : '56'} h-[calc(100vh-4rem)] sticky top-16 bg-white overflow-y-auto border-r border-gray-100 transition-all duration-300 ${className}`}
-    >
+    <aside className={`hidden md:block w-56 min-w-56 h-[calc(100vh-4rem)] sticky top-16 bg-white overflow-y-auto border-r border-gray-100 ${className}`}>
       <div className="p-4">
         {categories.map((category, index) => (
           <div key={index} className="mb-8 last:mb-0">
-            {category.title && !isCollapsed && (
+            {category.title && (
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3 px-2">
                 {category.title}
               </h3>
@@ -116,16 +62,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', isCollapsed }) => {
                   key={link.href}
                   to={link.href}
                   className={({ isActive }) =>
-                    `flex ${isCollapsed ? 'justify-center' : 'items-center'} px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'text-metanna-blue bg-metanna-blue/10'
                         : 'text-gray-700 hover:text-metanna-blue hover:bg-gray-50'
                     }`
                   }
-                  title={isCollapsed ? link.label : undefined}
                 >
-                  <span className={isCollapsed ? '' : 'mr-3'}>{link.icon}</span>
-                  {!isCollapsed && <span>{link.label}</span>}
+                  <span className="mr-3">{link.icon}</span>
+                  <span>{link.label}</span>
                 </NavLink>
               ))}
             </nav>
