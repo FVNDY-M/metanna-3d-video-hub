@@ -1,225 +1,304 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/PageLayout';
-import VideoCard, { VideoData } from '@/components/VideoCard';
-import EmptyState from '@/components/EmptyState';
-import { Search, User, Video } from 'lucide-react';
+import VideoCard from '@/components/VideoCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-
-interface UserProfile {
-  id: string;
-  username: string;
-  avatar_url?: string;
-  subscriber_count: number;
-}
+import { User, Video } from 'lucide-react';
+import EmptyState from '@/components/EmptyState';
 
 const SearchResults = () => {
-  const [searchParams] = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
   
-  const [videoResults, setVideoResults] = useState<VideoData[]>([]);
-  const [userResults, setUserResults] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('videos');
-  const [currentUser, setCurrentUser] = useState(null);
-
   useEffect(() => {
-    const search = async () => {
-      if (!query.trim()) {
-        setVideoResults([]);
-        setUserResults([]);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
+    const params = new URLSearchParams(location.search);
+    const query = params.get('q') || '';
+    setSearchQuery(query);
+  }, [location.search]);
+  
+  // Search videos
+  const { data: videos, isLoading: videosLoading } = useQuery({
+    queryKey: ['searchVideos', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery) return [];
       
-      try {
-        // Search for videos
-        const { data: videosData, error: videosError } = await supabase
-          .from('videos')
-          .select(`
-            id,
-            title,
-            description,
-            category,
-            thumbnail_url,
-            video_url,
-            user_id,
-            created_at,
-            views,
-            likes_count,
-            comments_count,
-            visibility
-          `)
-          .or(`title.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
-          .eq('visibility', 'public');
-          
-        if (videosError) {
-          console.error('Error searching videos:', videosError);
-          throw videosError;
+      // Build search query for partial matches in title, description, and category
+      const { data, error } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            avatar_url,
+            subscriber_count
+          )
+        `)
+        .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`)
+        .eq('visibility', 'public')
+        .order('views', { ascending: false });
+      
+      if (error) throw error;
+      
+      return data.map(video => ({
+        ...video,
+        creator: {
+          id: video.user_id,
+          username: video.profiles.username,
+          avatar: video.profiles.avatar_url,
+          subscribers: video.profiles.subscriber_count
         }
-
-        // Get creators info for the videos
-        if (videosData) {
-          const videos = await Promise.all(
-            videosData.map(async (video) => {
-              const { data: creatorData } = await supabase
-                .from('profiles')
-                .select('username, avatar_url, subscriber_count')
-                .eq('id', video.user_id)
-                .single();
-
-              return {
-                id: video.id,
-                title: video.title,
-                thumbnail: video.thumbnail_url,
-                videoUrl: video.video_url,
-                description: video.description,
-                category: video.category,
-                creator: {
-                  id: video.user_id,
-                  username: creatorData?.username || 'Unknown Creator',
-                  avatar: creatorData?.avatar_url,
-                  subscribers: creatorData?.subscriber_count || 0
-                },
-                likes: video.likes_count || 0,
-                comments: video.comments_count || 0,
-                immersions: video.views || 0,
-                createdAt: video.created_at
-              } as VideoData;
-            })
-          );
-
-          setVideoResults(videos);
-        }
-
-        // Search for users
-        const { data: usersData, error: usersError } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, subscriber_count')
-          .ilike('username', `%${query}%`);
-
-        if (usersError) {
-          console.error('Error searching users:', usersError);
-          throw usersError;
-        }
-
-        if (usersData) {
-          setUserResults(usersData);
-        }
-      } catch (error) {
-        console.error('Error during search:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    search();
-  }, [query]);
-
-  const renderVideoResults = () => {
-    if (videoResults.length === 0) {
-      return (
-        <EmptyState 
-          title="No videos found" 
-          description={`We couldn't find any videos matching "${query}". Try different keywords.`}
-          icon={<Video className="h-12 w-12 text-gray-400" />}
-        />
-      );
-    }
-
+      }));
+    },
+    enabled: !!searchQuery,
+  });
+  
+  // Search users/profiles
+  const { data: users, isLoading: usersLoading } = useQuery({
+    queryKey: ['searchUsers', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery) return [];
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', `%${searchQuery}%`)
+        .order('subscriber_count', { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      
+      return data;
+    },
+    enabled: !!searchQuery,
+  });
+  
+  if (!searchQuery) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-        {videoResults.map((video) => (
-          <VideoCard key={video.id} video={video} />
-        ))}
-      </div>
+      <PageLayout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h1 className="text-2xl font-bold mb-6">Search Results</h1>
+          <EmptyState
+            title="No search query provided"
+            description="Please enter a search term to find videos and creators."
+            icon="search"
+          />
+        </div>
+      </PageLayout>
     );
-  };
-
-  const renderUserResults = () => {
-    if (userResults.length === 0) {
-      return (
-        <EmptyState 
-          title="No users found" 
-          description={`We couldn't find any users matching "${query}". Try different keywords.`}
-          icon={<User className="h-12 w-12 text-gray-400" />}
-        />
-      );
-    }
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 animate-fade-in">
-        {userResults.map((user) => (
-          <div key={user.id} className="flex flex-col items-center p-6 border rounded-lg hover:shadow-md transition-shadow">
-            <Avatar className="h-20 w-20 mb-3">
-              <AvatarImage src={user.avatar_url} alt={user.username} />
-              <AvatarFallback className="text-lg font-bold bg-indigo-100 text-indigo-600">
-                {user.username.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <h3 className="text-lg font-medium mb-1">{user.username}</h3>
-            <p className="text-sm text-gray-500 mb-3">{user.subscriber_count} subscribers</p>
-            <Button size="sm" variant="outline" className="rounded-full" asChild>
-              <Link to={`/profile/${user.id}`}>View Profile</Link>
-            </Button>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  }
 
   return (
-    <PageLayout user={currentUser}>
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-2">Search Results</h1>
-        <p className="text-gray-500 mb-6">
-          {loading ? 'Searching...' : 
-          (videoResults.length > 0 || userResults.length > 0) 
-            ? `Found ${videoResults.length + userResults.length} result${videoResults.length + userResults.length === 1 ? '' : 's'} for "${query}"` 
-            : `No results found for "${query}"`}
-        </p>
+    <PageLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-2xl font-bold mb-6">Search Results for "{searchQuery}"</h1>
         
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="loader"></div>
-          </div>
-        ) : (
-          <Tabs defaultValue="videos" className="w-full" onValueChange={setActiveTab}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="videos" className="relative">
-                Videos
-                {videoResults.length > 0 && (
-                  <span className="ml-2 bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full">
-                    {videoResults.length}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="users" className="relative">
-                Users
-                {userResults.length > 0 && (
-                  <span className="ml-2 bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full">
-                    {userResults.length}
-                  </span>
-                )}
-              </TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="all" className="mb-8">
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="videos">Videos</TabsTrigger>
+            <TabsTrigger value="users">Creators</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all">
+            {/* Users section */}
+            {usersLoading ? (
+              <div className="animate-pulse">
+                <h2 className="text-xl font-semibold mb-4">Creators</h2>
+                <div className="flex flex-wrap gap-4 mb-8">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 w-64">
+                      <div className="w-12 h-12 rounded-full bg-gray-200"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-16"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : users && users.length > 0 ? (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-4">Creators</h2>
+                <div className="flex flex-wrap gap-4">
+                  {users.map((user) => (
+                    <Link 
+                      key={user.id} 
+                      to={`/creator/${user.username}`}
+                      className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-metanna-blue hover:shadow-sm transition-all w-64"
+                    >
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={user.avatar_url} alt={user.username} />
+                        <AvatarFallback className="bg-metanna-blue text-white">
+                          {user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-medium text-gray-900">{user.username}</h3>
+                        <p className="text-sm text-gray-500">{user.subscriber_count} subscribers</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : !usersLoading && (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-4">Creators</h2>
+                <p className="text-gray-500">No creators found matching "{searchQuery}"</p>
+              </div>
+            )}
             
-            <TabsContent value="videos" className="mt-2">
-              {renderVideoResults()}
-            </TabsContent>
+            {/* Videos section */}
+            {videosLoading ? (
+              <div className="animate-pulse">
+                <h2 className="text-xl font-semibold mb-4">Videos</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                    <div key={i}>
+                      <div className="aspect-video bg-gray-200 rounded-xl mb-2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : videos && videos.length > 0 ? (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Videos</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {videos.map((video) => (
+                    <VideoCard 
+                      key={video.id} 
+                      video={{
+                        id: video.id,
+                        title: video.title,
+                        thumbnail: video.thumbnail_url || '/placeholder.svg',
+                        videoUrl: video.video_url,
+                        creator: video.creator,
+                        likes: video.likes_count,
+                        comments: video.comments_count,
+                        immersions: video.views,
+                        createdAt: video.created_at,
+                        visibility: video.visibility,
+                        category: video.category,
+                        description: video.description
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : !videosLoading && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Videos</h2>
+                <p className="text-gray-500">No videos found matching "{searchQuery}"</p>
+              </div>
+            )}
             
-            <TabsContent value="users" className="mt-2">
-              {renderUserResults()}
-            </TabsContent>
-          </Tabs>
-        )}
+            {/* Show empty state if both searches return nothing */}
+            {!usersLoading && !videosLoading && users?.length === 0 && videos?.length === 0 && (
+              <EmptyState
+                title="No results found"
+                description={`We couldn't find any videos or creators matching "${searchQuery}"`}
+                icon="search"
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="videos">
+            {videosLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="aspect-video bg-gray-200 rounded-xl mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                ))}
+              </div>
+            ) : videos && videos.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {videos.map((video) => (
+                  <VideoCard 
+                    key={video.id} 
+                    video={{
+                      id: video.id,
+                      title: video.title,
+                      thumbnail: video.thumbnail_url || '/placeholder.svg',
+                      videoUrl: video.video_url,
+                      creator: video.creator,
+                      likes: video.likes_count,
+                      comments: video.comments_count,
+                      immersions: video.views,
+                      createdAt: video.created_at,
+                      visibility: video.visibility,
+                      category: video.category,
+                      description: video.description
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No videos found"
+                description={`We couldn't find any videos matching "${searchQuery}"`}
+                icon="video"
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="users">
+            {usersLoading ? (
+              <div className="animate-pulse">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="flex items-center space-x-4 p-4 rounded-lg border border-gray-200">
+                      <div className="w-16 h-16 rounded-full bg-gray-200"></div>
+                      <div className="flex-1">
+                        <div className="h-5 bg-gray-200 rounded w-24 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-32 mb-1"></div>
+                        <div className="h-3 bg-gray-200 rounded w-20"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : users && users.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {users.map((user) => (
+                  <Link 
+                    key={user.id} 
+                    to={`/creator/${user.username}`}
+                    className="flex items-center space-x-4 p-4 rounded-lg border border-gray-200 hover:border-metanna-blue hover:shadow-sm transition-all"
+                  >
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={user.avatar_url} alt={user.username} />
+                      <AvatarFallback className="bg-metanna-blue text-white text-xl">
+                        {user.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium text-gray-900 text-lg">{user.username}</h3>
+                      <p className="text-gray-500">{user.subscriber_count} subscribers</p>
+                      {user.bio && (
+                        <p className="text-gray-600 text-sm mt-1 line-clamp-2">{user.bio}</p>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No creators found"
+                description={`We couldn't find any creators matching "${searchQuery}"`}
+                icon="user"
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </PageLayout>
   );

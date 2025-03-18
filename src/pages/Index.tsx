@@ -1,263 +1,225 @@
 
 import React, { useState, useEffect } from 'react';
-import PageLayout from '@/components/PageLayout';
-import VideoCard, { VideoData } from '@/components/VideoCard';
-import EmptyState from '@/components/EmptyState';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger, TabsHeader } from '@/components/ui/tabs';
+import { useQuery } from '@tanstack/react-query';
+import PageLayout from '@/components/PageLayout';
+import VideoCard from '@/components/VideoCard';
+import EmptyState from '@/components/EmptyState';
 
 const Index = () => {
-  const [videos, setVideos] = useState<VideoData[]>([]);
-  const [subscriptionVideos, setSubscriptionVideos] = useState<VideoData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
-  const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('explore');
-  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
-
-  // Fetch videos for the Explore section (all public videos)
-  const fetchExploreVideos = async () => {
-    setLoading(true);
-    try {
-      // Fetch videos from Supabase
-      const { data: videosData, error } = await supabase
-        .from('videos')
-        .select(`
-          id,
-          title,
-          thumbnail_url,
-          created_at,
-          user_id,
-          views,
-          likes_count,
-          comments_count,
-          category
-        `)
-        .eq('visibility', 'public')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      // For each video, fetch the creator information
-      if (videosData) {
-        const videosWithCreators = await Promise.all(
-          videosData.map(async (video) => {
-            // Fetch user profile data for each video
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('username, avatar_url, subscriber_count')
-              .eq('id', video.user_id)
-              .single();
-
-            return {
-              id: video.id,
-              title: video.title,
-              thumbnail: video.thumbnail_url,
-              category: video.category,
-              creator: {
-                id: video.user_id,
-                username: profileData?.username || 'Unknown Creator',
-                avatar: profileData?.avatar_url,
-                subscribers: profileData?.subscriber_count || 0
-              },
-              likes: video.likes_count || 0,
-              comments: video.comments_count || 0,
-              immersions: video.views || 0,
-              createdAt: video.created_at,
-            };
-          })
-        );
-
-        setVideos(videosWithCreators);
-      }
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-      toast.error('Failed to load videos');
-      setLoading(false);
-    }
-  };
-
-  // Fetch videos from subscribed channels for the Home section
-  const fetchSubscriptionVideos = async () => {
-    if (!currentUser) {
-      setSubscriptionsLoading(false);
-      return;
-    }
-    
-    setSubscriptionsLoading(true);
-    try {
-      // First get all the creators the user is subscribed to
-      const { data: subscriptions, error: subError } = await supabase
-        .from('subscriptions')
-        .select('creator_id')
-        .eq('subscriber_id', currentUser.id);
-        
-      if (subError) throw subError;
-      
-      if (!subscriptions || subscriptions.length === 0) {
-        setSubscriptionVideos([]);
-        setSubscriptionsLoading(false);
-        return;
-      }
-      
-      // Get the creator IDs
-      const creatorIds = subscriptions.map(sub => sub.creator_id);
-      
-      // Fetch videos from these creators
-      const { data: videosData, error } = await supabase
-        .from('videos')
-        .select(`
-          id,
-          title,
-          thumbnail_url,
-          created_at,
-          user_id,
-          views,
-          likes_count,
-          comments_count,
-          category
-        `)
-        .in('user_id', creatorIds)
-        .eq('visibility', 'public')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (videosData) {
-        const videosWithCreators = await Promise.all(
-          videosData.map(async (video) => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('username, avatar_url, subscriber_count')
-              .eq('id', video.user_id)
-              .single();
-
-            return {
-              id: video.id,
-              title: video.title,
-              thumbnail: video.thumbnail_url,
-              category: video.category,
-              creator: {
-                id: video.user_id,
-                username: profileData?.username || 'Unknown Creator',
-                avatar: profileData?.avatar_url,
-                subscribers: profileData?.subscriber_count || 0
-              },
-              likes: video.likes_count || 0,
-              comments: video.comments_count || 0,
-              immersions: video.views || 0,
-              createdAt: video.created_at,
-            };
-          })
-        );
-
-        setSubscriptionVideos(videosWithCreators);
-      }
-      
-      setSubscriptionsLoading(false);
-    } catch (error) {
-      console.error('Error fetching subscription videos:', error);
-      toast.error('Failed to load subscription videos');
-      setSubscriptionsLoading(false);
-    }
-  };
-
+  const location = useLocation();
+  const [user, setUser] = useState<any>(null);
+  const isExplore = location.pathname === '/explore';
+  const isTrending = location.pathname === '/trending';
+  
   useEffect(() => {
-    // Check if user is logged in
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', data.session.user.id)
-          .single();
-          
-        if (profileData) {
-          setUser({
-            username: profileData.username,
-            avatar: profileData.avatar_url
-          });
-        }
-        
-        setCurrentUser({ id: data.session.user.id });
-      }
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
     };
+    
+    fetchUser();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
-    checkUser();
-  }, []);
+  // Function to fetch subscribed channels
+  const fetchSubscribedChannels = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('creator_id')
+      .eq('subscriber_id', userId);
+    
+    if (error) throw error;
+    return data.map(sub => sub.creator_id);
+  };
+
+  // Query for videos from subscribed channels (Home page)
+  const { data: homeVideos, isLoading: homeLoading } = useQuery({
+    queryKey: ['homeVideos', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const subscribedChannels = await fetchSubscribedChannels(user.id);
+      
+      if (subscribedChannels.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            avatar_url,
+            subscriber_count
+          )
+        `)
+        .in('user_id', subscribedChannels)
+        .eq('visibility', 'public')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      
+      return data.map(video => ({
+        ...video,
+        creator: {
+          id: video.user_id,
+          username: video.profiles.username,
+          avatar: video.profiles.avatar_url,
+          subscribers: video.profiles.subscriber_count
+        }
+      }));
+    },
+    enabled: !!user && !isExplore && !isTrending,
+  });
+
+  // Query for all public videos (Explore page)
+  const { data: exploreVideos, isLoading: exploreLoading } = useQuery({
+    queryKey: ['exploreVideos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            avatar_url,
+            subscriber_count
+          )
+        `)
+        .eq('visibility', 'public')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      
+      return data.map(video => ({
+        ...video,
+        creator: {
+          id: video.user_id,
+          username: video.profiles.username,
+          avatar: video.profiles.avatar_url,
+          subscribers: video.profiles.subscriber_count
+        }
+      }));
+    },
+    enabled: isExplore || (!user && !isTrending) || isTrending,
+  });
+
+  // Query for trending videos
+  const { data: trendingVideos, isLoading: trendingLoading } = useQuery({
+    queryKey: ['trendingVideos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            avatar_url,
+            subscriber_count
+          )
+        `)
+        .eq('visibility', 'public')
+        .order('views', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      
+      return data.map(video => ({
+        ...video,
+        creator: {
+          id: video.user_id,
+          username: video.profiles.username,
+          avatar: video.profiles.avatar_url,
+          subscribers: video.profiles.subscriber_count
+        }
+      }));
+    },
+    enabled: isTrending,
+  });
+
+  let videos = [];
+  let isLoading = false;
+  let pageTitle = 'Home';
+  let emptyStateMessage = "Subscribe to creators to see their videos here!";
   
-  useEffect(() => {
-    fetchExploreVideos();
-  }, []);
-  
-  useEffect(() => {
-    if (currentUser) {
-      fetchSubscriptionVideos();
+  if (isExplore) {
+    videos = exploreVideos || [];
+    isLoading = exploreLoading;
+    pageTitle = 'Explore';
+    emptyStateMessage = "No videos have been uploaded yet.";
+  } else if (isTrending) {
+    videos = trendingVideos || [];
+    isLoading = trendingLoading;
+    pageTitle = 'Trending';
+    emptyStateMessage = "No trending videos available.";
+  } else {
+    // Home page - show subscribed videos if logged in, or explore videos if not
+    if (user) {
+      videos = homeVideos || [];
+      isLoading = homeLoading;
+    } else {
+      videos = exploreVideos || [];
+      isLoading = exploreLoading;
+      emptyStateMessage = "Log in to see videos from channels you subscribe to.";
     }
-  }, [currentUser]);
+  }
 
   return (
-    <PageLayout user={user}>
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsHeader>
-            <h1 className="text-2xl font-semibold text-gray-900 mb-4">Discover AR Experiences</h1>
-          </TabsHeader>
-          <TabsList className="mb-4">
-            <TabsTrigger value="home">Home</TabsTrigger>
-            <TabsTrigger value="explore">Explore</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="home">
-            {currentUser ? (
-              subscriptionsLoading ? (
-                <div className="flex justify-center items-center py-20">
-                  <div className="loader"></div>
-                </div>
-              ) : subscriptionVideos.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                  {subscriptionVideos.map((video) => (
-                    <VideoCard key={video.id} video={video} />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState 
-                  title="No subscription videos found" 
-                  description="Videos from channels you subscribe to will appear here. Start by subscribing to some channels." 
-                  icon="🎬" 
-                />
-              )
-            ) : (
-              <EmptyState 
-                title="Sign in to see personalized content" 
-                description="Log in to see videos from channels you subscribe to." 
-                icon="🔒" 
+    <PageLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-2xl font-bold mb-6">{pageTitle}</h1>
+        
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-video bg-gray-200 rounded-xl mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        ) : videos.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {videos.map((video) => (
+              <VideoCard 
+                key={video.id} 
+                video={{
+                  id: video.id,
+                  title: video.title,
+                  thumbnail: video.thumbnail_url || '/placeholder.svg',
+                  videoUrl: video.video_url,
+                  creator: video.creator,
+                  likes: video.likes_count,
+                  comments: video.comments_count,
+                  immersions: video.views,
+                  createdAt: video.created_at,
+                  visibility: video.visibility,
+                  category: video.category,
+                  description: video.description
+                }}
               />
-            )}
-          </TabsContent>
-          
-          <TabsContent value="explore">
-            {loading ? (
-              <div className="flex justify-center items-center py-20">
-                <div className="loader"></div>
-              </div>
-            ) : videos.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                {videos.map((video) => (
-                  <VideoCard key={video.id} video={video} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState />
-            )}
-          </TabsContent>
-        </Tabs>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title={`No videos to show`}
+            description={emptyStateMessage}
+            icon="video"
+          />
+        )}
       </div>
     </PageLayout>
   );

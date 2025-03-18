@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Heart, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -26,9 +27,10 @@ export interface VideoData {
 interface VideoCardProps {
   video: VideoData;
   className?: string;
+  onClick?: (video: VideoData) => void;
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
+const VideoCard: React.FC<VideoCardProps> = ({ video, className = '', onClick }) => {
   // Calculate time difference
   const getTimeDifference = (date: Date | string) => {
     const now = new Date();
@@ -50,8 +52,9 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
   };
 
   const handleVideoClick = () => {
-    // Use the global function to open the video modal
-    if (window.openVideoModal) {
+    if (onClick) {
+      onClick(video);
+    } else if (window.openVideoModal) {
       window.openVideoModal(video.id);
     }
   };
@@ -78,12 +81,14 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
       </div>
       
       <div className="flex items-center mt-3 space-x-3">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
-          <AvatarFallback className="bg-indigo-600 text-white">
-            {video.creator.username.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <Link to={`/creator/${video.creator.username}`} onClick={(e) => e.stopPropagation()}>
+          <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-metanna-blue transition-all">
+            <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
+            <AvatarFallback className="bg-indigo-600 text-white">
+              {video.creator.username.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
         
         <div className="flex-1 min-w-0">
           <div 
@@ -96,7 +101,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
           </div>
           
           <div className="flex items-center text-xs text-gray-500 mt-1 space-x-3">
-            <span>{video.creator.username}</span>
+            <Link 
+              to={`/creator/${video.creator.username}`} 
+              className="hover:text-metanna-blue hover:underline transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {video.creator.username}
+            </Link>
             <span>·</span>
             <span>{video.immersions.toLocaleString()} immersions</span>
             <span>·</span>
