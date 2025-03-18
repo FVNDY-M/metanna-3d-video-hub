@@ -12,6 +12,9 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Function to increment video views
+// Only called when:
+// 1. User watches at least 50% of the video, or
+// 2. User skips to at least the 50% mark
 export const incrementVideoView = async (videoId: string, userId?: string) => {
   if (!videoId) return;
 

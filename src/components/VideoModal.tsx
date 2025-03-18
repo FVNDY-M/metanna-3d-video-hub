@@ -4,7 +4,7 @@ import {
   Dialog, 
   DialogContent,
 } from "@/components/ui/dialog";
-import { Heart, Share2, MessageSquare, Eye, Play } from 'lucide-react';
+import { Heart, Share2, MessageSquare, Eye, Play, Trash2, AlertTriangle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,6 +13,16 @@ import { incrementVideoView } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
 import { useNavigate } from 'react-router-dom';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -39,6 +49,8 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
   const [isLiked, setIsLiked] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
+  const [viewCounted, setViewCounted] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -116,12 +128,8 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             createdAt: videoData.created_at,
           });
 
-          // Register view
-          if (currentUser) {
-            incrementVideoView(videoId, currentUser.id);
-          } else {
-            incrementVideoView(videoId);
-          }
+          // We'll count the view only after the user watches 50% of the video
+          setViewCounted(false);
 
           if (currentUser) {
             const { data: likeData } = await supabase
@@ -189,6 +197,32 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     }
   }, [isOpen, videoId, currentUser]);
 
+  const handleTimeUpdate = () => {
+    if (videoRef.current && !viewCounted && video) {
+      const video = videoRef.current;
+      const percentage = (video.currentTime / video.duration) * 100;
+      
+      // Count view once user has watched 50% of the video
+      if (percentage >= 50 && !viewCounted) {
+        setViewCounted(true);
+        if (currentUser) {
+          incrementVideoView(video.id, currentUser.id);
+        } else {
+          incrementVideoView(video.id);
+        }
+        
+        // Update UI immediately
+        setVideo(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            immersions: prev.immersions + 1
+          };
+        });
+      }
+    }
+  };
+
   const handlePlayVideo = () => {
     setIsPlaying(true);
     if (videoRef.current) {
@@ -218,7 +252,13 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
 
   const handleSubscribe = () => {
     handleAuthAction(async () => {
-      if (!video || !currentUser) return;
+      if (!video || !currentUser || !video.creator.id) return;
+      
+      // Prevent subscribing to yourself
+      if (currentUser.id === video.creator.id) {
+        toast.error("You cannot subscribe to your own channel");
+        return;
+      }
       
       if (isSubscribed) {
         const { error } = await supabase
@@ -360,6 +400,33 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     }, 'comment');
   };
 
+  const deleteVideo = () => {
+    handleAuthAction(async () => {
+      if (!video || !currentUser) return;
+      
+      // Check if user owns the video
+      if (video.creator.id !== currentUser.id) {
+        toast.error("You can only delete your own videos");
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', video.id);
+        
+      if (error) {
+        toast.error('Failed to delete video');
+        console.error('Delete error:', error);
+        return;
+      }
+      
+      toast.success('Video deleted successfully');
+      onClose();
+      navigate('/your-videos');
+    }, 'delete this video');
+  };
+
   const getTimeDifference = (date: Date | string) => {
     const now = new Date();
     const past = new Date(date);
@@ -381,176 +448,217 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
       return 'Just now';
     }
   };
+  
+  const isOwnVideo = video && currentUser && video.creator.id === currentUser.id;
 
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-xl">
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="loader"></div>
-          </div>
-        ) : video ? (
-          <div className="flex flex-col max-h-[80vh]">
-            <div className="relative w-full aspect-video bg-black">
-              {isPlaying ? (
-                <video
-                  ref={videoRef}
-                  src={video.videoUrl}
-                  poster={video.thumbnail}
-                  className="w-full h-full object-contain"
-                  controls
-                ></video>
-              ) : (
-                <>
-                  <img 
-                    src={video.thumbnail || '/placeholder.svg'} 
-                    alt={video.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div 
-                    className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                    onClick={handlePlayVideo}
-                  >
-                    <div className="bg-indigo-600 rounded-full p-4 hover:bg-indigo-700 transition-colors">
-                      <Play className="h-8 w-8 text-white fill-white" />
-                    </div>
-                  </div>
-                </>
-              )}
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-xl">
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="loader"></div>
             </div>
-            
-            <ScrollArea className="flex-1 overflow-auto" style={{ maxHeight: "calc(80vh - 56.25%)" }}>
-              <div className="p-4">
-                <h2 className="text-xl font-bold mb-2">{video.title}</h2>
-                
-                {video.category && (
-                  <div className="mb-2">
-                    <span className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                      {video.category}
-                    </span>
-                  </div>
-                )}
-                
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
-                      <AvatarFallback className="bg-gray-200">
-                        {video.creator.username.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{video.creator.username}</p>
-                      <p className="text-sm text-gray-500">{video.creator.subscribers?.toLocaleString()} Subscribers</p>
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    onClick={handleSubscribe}
-                    className={`px-6 py-2 rounded-full transition-colors ${
-                      isSubscribed 
-                        ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' 
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                    }`}
-                  >
-                    {isSubscribed ? 'Subscribed' : 'Subscribe'}
-                  </Button>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <Eye className="h-4 w-4 mr-1" />
-                      <span>{video.immersions?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center cursor-pointer" onClick={handleLike}>
-                      <Heart className={`h-4 w-4 mr-1 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                      <span>{video.likes?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <MessageSquare className="h-4 w-4 mr-1" />
-                      <span>{video.comments?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Share2 className="h-4 w-4 mr-1" />
-                      <span>Share</span>
-                    </div>
-                  </div>
-                  
-                  <span>{getTimeDifference(video.createdAt)}</span>
-                </div>
-                
-                {video.description && (
-                  <div className="p-3 bg-gray-50 rounded-lg mb-4">
-                    <p className="text-sm text-gray-700">{video.description}</p>
-                  </div>
-                )}
-                
-                <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3">Comments</h3>
-                  
-                  <div className="flex items-start space-x-3 mb-6">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-gray-200">U</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <textarea 
-                        placeholder="Add a comment..." 
-                        className="w-full border rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        rows={2}
-                      />
-                      <div className="flex justify-end mt-2">
-                        <Button 
-                          size="sm"
-                          onClick={handleComment}
-                          disabled={!commentText.trim()}
-                        >
-                          Comment
-                        </Button>
+          ) : video ? (
+            <div className="flex flex-col max-h-[80vh]">
+              <div className="relative w-full aspect-video bg-black">
+                {isPlaying ? (
+                  <video
+                    ref={videoRef}
+                    src={video.videoUrl}
+                    poster={video.thumbnail}
+                    className="w-full h-full object-contain"
+                    controls
+                    onTimeUpdate={handleTimeUpdate}
+                  ></video>
+                ) : (
+                  <>
+                    <img 
+                      src={video.thumbnail || '/placeholder.svg'} 
+                      alt={video.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div 
+                      className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                      onClick={handlePlayVideo}
+                    >
+                      <div className="bg-indigo-600 rounded-full p-4 hover:bg-indigo-700 transition-colors">
+                        <Play className="h-8 w-8 text-white fill-white" />
                       </div>
                     </div>
+                  </>
+                )}
+              </div>
+              
+              <ScrollArea className="flex-1 overflow-auto" style={{ maxHeight: "calc(80vh - 56.25%)" }}>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xl font-bold">{video.title}</h2>
+                    
+                    {isOwnVideo && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => setShowDeleteDialog(true)}
+                        className="flex items-center gap-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete</span>
+                      </Button>
+                    )}
                   </div>
                   
-                  {comments.map(comment => (
-                    <div key={comment.id} className="flex space-x-3 mb-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
+                  {video.category && (
+                    <div className="mb-2">
+                      <span className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                        {video.category}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={video.creator.avatar} alt={video.creator.username} />
                         <AvatarFallback className="bg-gray-200">
-                          {comment.user.username.charAt(0).toUpperCase()}
+                          {video.creator.username.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">{comment.user.username}</p>
-                          <span className="text-xs text-gray-500">{getTimeDifference(comment.created_at)}</span>
-                        </div>
-                        <p className="text-sm">{comment.content}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <button className="text-gray-500 hover:text-gray-700">
-                            <Heart className="h-3.5 w-3.5" />
-                          </button>
-                          <button className="text-gray-500 hover:text-gray-700">
-                            <MessageSquare className="h-3.5 w-3.5" />
-                          </button>
+                        <p className="font-medium">{video.creator.username}</p>
+                        <p className="text-sm text-gray-500">{video.creator.subscribers?.toLocaleString()} Subscribers</p>
+                      </div>
+                    </div>
+                    
+                    {currentUser && currentUser.id !== video.creator.id && (
+                      <Button 
+                        onClick={handleSubscribe}
+                        className={`px-6 py-2 rounded-full transition-colors ${
+                          isSubscribed 
+                            ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' 
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        }`}
+                      >
+                        {isSubscribed ? 'Subscribed' : 'Subscribe'}
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center">
+                        <Eye className="h-4 w-4 mr-1" />
+                        <span>{video.immersions?.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center cursor-pointer" onClick={handleLike}>
+                        <Heart className={`h-4 w-4 mr-1 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                        <span>{video.likes?.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        <span>{video.comments?.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Share2 className="h-4 w-4 mr-1" />
+                        <span>Share</span>
+                      </div>
+                    </div>
+                    
+                    <span>{getTimeDifference(video.createdAt)}</span>
+                  </div>
+                  
+                  {video.description && (
+                    <div className="p-3 bg-gray-50 rounded-lg mb-4">
+                      <p className="text-sm text-gray-700">{video.description}</p>
+                    </div>
+                  )}
+                  
+                  <div className="border-t pt-4">
+                    <h3 className="font-medium mb-3">Comments</h3>
+                    
+                    <div className="flex items-start space-x-3 mb-6">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-gray-200">U</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <textarea 
+                          placeholder="Add a comment..." 
+                          className="w-full border rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          rows={2}
+                        />
+                        <div className="flex justify-end mt-2">
+                          <Button 
+                            size="sm"
+                            onClick={handleComment}
+                            disabled={!commentText.trim()}
+                          >
+                            Comment
+                          </Button>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    
+                    {comments.map(comment => (
+                      <div key={comment.id} className="flex space-x-3 mb-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
+                          <AvatarFallback className="bg-gray-200">
+                            {comment.user.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium">{comment.user.username}</p>
+                            <span className="text-xs text-gray-500">{getTimeDifference(comment.created_at)}</span>
+                          </div>
+                          <p className="text-sm">{comment.content}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <button className="text-gray-500 hover:text-gray-700">
+                              <Heart className="h-3.5 w-3.5" />
+                            </button>
+                            <button className="text-gray-500 hover:text-gray-700">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </ScrollArea>
-          </div>
-        ) : (
-          <div className="p-8 text-center">
-            <p>Video not found</p>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+              </ScrollArea>
+            </div>
+          ) : (
+            <div className="p-8 text-center">
+              <p>Video not found</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Video</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this video? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteVideo}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 

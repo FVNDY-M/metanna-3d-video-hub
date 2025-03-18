@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
   DialogContent,
@@ -22,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
+import { Image, Upload } from 'lucide-react';
 
 interface EditVideoModalProps {
   isOpen: boolean;
@@ -55,12 +56,17 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   const [video, setVideo] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchVideoDetails = async () => {
@@ -121,6 +127,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
           setDescription(processedVideo.description || '');
           setCategory(processedVideo.category || 'Uncategorized');
           setVisibility(processedVideo.visibility || 'private');
+          setThumbnailPreview(processedVideo.thumbnail);
         }
       } catch (error) {
         console.error('Error fetching video details:', error);
@@ -135,18 +142,80 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     }
   }, [isOpen, videoId]);
 
+  const handleThumbnailClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file for the thumbnail');
+      return;
+    }
+    
+    setThumbnailFile(file);
+    setThumbnailPreview(URL.createObjectURL(file));
+  };
+
+  const uploadThumbnail = async (): Promise<string | null> => {
+    if (!thumbnailFile || !videoId) return null;
+    
+    setUploadingThumbnail(true);
+    try {
+      // Use uuidv4 to generate a unique filename
+      const fileName = `${videoId}_${Date.now()}.${thumbnailFile.name.split('.').pop()}`;
+      
+      const { error: uploadError, data } = await supabase.storage
+        .from('thumbnails')
+        .upload(fileName, thumbnailFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+        
+      if (uploadError) throw uploadError;
+      
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('thumbnails')
+        .getPublicUrl(fileName);
+        
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading thumbnail:', error);
+      toast.error('Failed to upload thumbnail');
+      return null;
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!videoId) return;
     
     setSaving(true);
     try {
+      let thumbnailUrl = null;
+      
+      // Upload new thumbnail if one was selected
+      if (thumbnailFile) {
+        thumbnailUrl = await uploadThumbnail();
+        if (!thumbnailUrl) {
+          toast.error('Failed to upload thumbnail');
+          setSaving(false);
+          return;
+        }
+      }
+      
       const { error } = await supabase
         .from('videos')
         .update({
           title,
           description,
           category,
-          visibility
+          visibility,
+          ...(thumbnailUrl && { thumbnail_url: thumbnailUrl })
         })
         .eq('id', videoId);
 
@@ -237,15 +306,43 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
               </div>
               
               <div className="col-span-4">
-                <div className="aspect-video bg-black rounded-md overflow-hidden">
-                  <img 
-                    src={video.thumbnail} 
-                    alt={video.title}
-                    className="w-full h-full object-cover"
+                <Label className="block mb-2">Thumbnail</Label>
+                <div 
+                  className="aspect-video bg-black rounded-md overflow-hidden cursor-pointer relative group"
+                  onClick={handleThumbnailClick}
+                >
+                  {thumbnailPreview ? (
+                    <>
+                      <img 
+                        src={thumbnailPreview} 
+                        alt={video.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="text-white text-center">
+                          <Image className="h-6 w-6 mx-auto mb-1" />
+                          <span className="text-xs">Change thumbnail</span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center bg-gray-200">
+                      <div className="text-gray-500 text-center">
+                        <Upload className="h-6 w-6 mx-auto mb-1" />
+                        <span className="text-xs">Upload thumbnail</span>
+                      </div>
+                    </div>
+                  )}
+                  <input 
+                    ref={fileInputRef}
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleThumbnailChange}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Thumbnail cannot be edited here
+                  Click to upload a new thumbnail
                 </p>
               </div>
             </div>
@@ -256,9 +353,9 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
               </Button>
               <Button 
                 onClick={handleSave} 
-                disabled={saving || !title.trim()}
+                disabled={saving || uploadingThumbnail || !title.trim()}
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving || uploadingThumbnail ? 'Saving...' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </div>
