@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
+import EditVideoModal from '@/components/EditVideoModal';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -11,6 +12,8 @@ const YourVideos = () => {
   const [videos, setVideos] = useState<VideoData[]>([]);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchUserVideos = async () => {
@@ -47,6 +50,8 @@ const YourVideos = () => {
           id: video.id,
           title: video.title,
           thumbnail: video.thumbnail_url || '',
+          category: video.category,
+          description: video.description,
           creator: {
             id: video.user_id,
             username: profileData?.username || 'Unknown Creator',
@@ -68,6 +73,71 @@ const YourVideos = () => {
 
     fetchUserVideos();
   }, []);
+
+  const handleVideoClick = (videoId: string) => {
+    setEditingVideoId(videoId);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditModalClose = () => {
+    setIsEditModalOpen(false);
+    setEditingVideoId(null);
+  };
+
+  const handleVideoUpdated = () => {
+    // Refetch videos after an update
+    const fetchUserVideos = async () => {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) return;
+      
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+        
+      const { data: videosData, error } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching videos:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (videosData) {
+        const processedVideos = videosData.map(video => ({
+          id: video.id,
+          title: video.title,
+          thumbnail: video.thumbnail_url || '',
+          category: video.category,
+          description: video.description,
+          creator: {
+            id: video.user_id,
+            username: profileData?.username || 'Unknown Creator',
+            avatar: profileData?.avatar_url || undefined,
+            subscribers: profileData?.subscriber_count || 0
+          },
+          likes: video.likes_count,
+          comments: video.comments_count,
+          immersions: video.views,
+          createdAt: video.created_at,
+          visibility: video.visibility
+        })) as VideoData[];
+        
+        setVideos(processedVideos);
+      }
+      
+      setLoading(false);
+    };
+
+    fetchUserVideos();
+  };
 
   return (
     <PageLayout>
@@ -93,12 +163,21 @@ const YourVideos = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {videos.map((video) => (
                 <div key={video.id} className="relative">
-                  <VideoCard video={video} />
-                  <Badge className={`absolute top-2 right-2 ${
-                    video.visibility === 'public' ? 'bg-green-500' : 'bg-amber-500'
-                  }`}>
-                    {video.visibility === 'public' ? 'Public' : 'Private'}
-                  </Badge>
+                  <div onClick={() => handleVideoClick(video.id)}>
+                    <VideoCard video={video} />
+                  </div>
+                  <div className="absolute top-2 right-2 flex gap-2">
+                    <Badge className={`${
+                      video.visibility === 'public' ? 'bg-green-500' : 'bg-amber-500'
+                    }`}>
+                      {video.visibility === 'public' ? 'Public' : 'Private'}
+                    </Badge>
+                    {video.category && (
+                      <Badge variant="outline" className="bg-white">
+                        {video.category}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -111,6 +190,13 @@ const YourVideos = () => {
           )}
         </CardContent>
       </Card>
+
+      <EditVideoModal
+        isOpen={isEditModalOpen}
+        onClose={handleEditModalClose}
+        videoId={editingVideoId}
+        onVideoUpdated={handleVideoUpdated}
+      />
     </PageLayout>
   );
 };

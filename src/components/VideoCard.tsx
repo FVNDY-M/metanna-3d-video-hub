@@ -18,6 +18,8 @@ export interface VideoData {
   immersions: number;
   createdAt: Date | string;
   visibility?: 'public' | 'private';
+  category?: string;
+  description?: string;
 }
 
 interface VideoCardProps {
