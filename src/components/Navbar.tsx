@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Menu, X, Upload, LogIn, Bell } from 'lucide-react';
+import { Search, Menu, X, Upload, LogIn, Bell, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -20,9 +21,10 @@ interface NavbarProps {
     avatar?: string;
   } | null;
   onUploadClick?: () => void;
+  onMenuClick?: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
+const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick, onMenuClick }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUser, setCurrentUser] = useState(user);
@@ -102,6 +104,15 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mr-2 hidden md:flex"
+              onClick={onMenuClick}
+              aria-label="Toggle sidebar"
+            >
+              <PanelLeft className="h-5 w-5" />
+            </Button>
             <div className="flex-shrink-0">
               <MetannaLogo />
             </div>
