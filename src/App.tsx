@@ -11,6 +11,10 @@ import Signup from "./pages/Signup";
 import VideoDetail from "./pages/VideoDetail";
 import Upload from "./pages/Upload";
 import SearchResults from "./pages/SearchResults";
+import WatchLater from "./pages/WatchLater";
+import LikedVideos from "./pages/LikedVideos";
+import YourVideos from "./pages/YourVideos";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -29,9 +33,30 @@ const App = () => (
           <Route path="/search" element={<SearchResults />} />
           <Route path="/trending" element={<Index />} />
           <Route path="/explore" element={<Index />} />
-          <Route path="/watch-later" element={<Index />} />
-          <Route path="/liked" element={<Index />} />
-          <Route path="/your-videos" element={<Index />} />
+          <Route 
+            path="/watch-later" 
+            element={
+              <ProtectedRoute>
+                <WatchLater />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/liked" 
+            element={
+              <ProtectedRoute>
+                <LikedVideos />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/your-videos" 
+            element={
+              <ProtectedRoute>
+                <YourVideos />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/creator/:username" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
