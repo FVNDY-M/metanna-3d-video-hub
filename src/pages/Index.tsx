@@ -74,9 +74,9 @@ const Index = () => {
         ...video,
         creator: {
           id: video.user_id,
-          username: video.profiles.username,
-          avatar: video.profiles.avatar_url,
-          subscribers: video.profiles.subscriber_count
+          username: video.profiles?.username || 'Unknown',
+          avatar: video.profiles?.avatar_url || null,
+          subscribers: video.profiles?.subscriber_count || 0
         }
       }));
     },
@@ -107,9 +107,9 @@ const Index = () => {
         ...video,
         creator: {
           id: video.user_id,
-          username: video.profiles.username,
-          avatar: video.profiles.avatar_url,
-          subscribers: video.profiles.subscriber_count
+          username: video.profiles?.username || 'Unknown',
+          avatar: video.profiles?.avatar_url || null,
+          subscribers: video.profiles?.subscriber_count || 0
         }
       }));
     },
@@ -140,9 +140,9 @@ const Index = () => {
         ...video,
         creator: {
           id: video.user_id,
-          username: video.profiles.username,
-          avatar: video.profiles.avatar_url,
-          subscribers: video.profiles.subscriber_count
+          username: video.profiles?.username || 'Unknown',
+          avatar: video.profiles?.avatar_url || null,
+          subscribers: video.profiles?.subscriber_count || 0
         }
       }));
     },

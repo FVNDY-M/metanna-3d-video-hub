@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -19,7 +18,6 @@ const UserProfile = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   
-  // Fetch current user session
   useEffect(() => {
     const fetchCurrentUser = async () => {
       const { data } = await supabase.auth.getSession();
@@ -31,7 +29,6 @@ const UserProfile = () => {
     fetchCurrentUser();
   }, []);
 
-  // Fetch profile data
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', username],
     queryFn: async () => {
@@ -47,7 +44,6 @@ const UserProfile = () => {
     enabled: !!username
   });
 
-  // Fetch user's videos
   const { data: videos, isLoading: videosLoading } = useQuery({
     queryKey: ['userVideos', profile?.id],
     queryFn: async () => {
@@ -55,7 +51,7 @@ const UserProfile = () => {
         .from('videos')
         .select('*')
         .eq('user_id', profile.id)
-        .eq('visibility', 'public')
+        .eq('visibility', 'public' as 'public' | 'private')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -64,13 +60,11 @@ const UserProfile = () => {
     enabled: !!profile?.id
   });
 
-  // Check if the current user is subscribed to this profile
   useEffect(() => {
     const checkSubscription = async () => {
       if (!currentUser || !profile) return;
       
       if (currentUser.id === profile.id) {
-        // User can't subscribe to themselves
         return;
       }
       
@@ -92,7 +86,6 @@ const UserProfile = () => {
     checkSubscription();
   }, [currentUser, profile]);
 
-  // Handle subscription toggle
   const handleSubscribe = async () => {
     if (!currentUser) {
       navigate('/login');
@@ -110,7 +103,6 @@ const UserProfile = () => {
     
     try {
       if (isSubscribed) {
-        // Unsubscribe
         const { error } = await supabase
           .from('subscriptions')
           .delete()
@@ -124,7 +116,6 @@ const UserProfile = () => {
           description: `You are no longer subscribed to ${profile.username}.`,
         });
       } else {
-        // Subscribe
         const { error } = await supabase
           .from('subscriptions')
           .insert({
@@ -149,7 +140,6 @@ const UserProfile = () => {
     }
   };
 
-  // Handle edit profile
   const handleEditProfile = () => {
     navigate('/edit-profile');
   };
@@ -191,7 +181,6 @@ const UserProfile = () => {
   return (
     <PageLayout>
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Profile Header */}
         <div className="flex flex-wrap md:flex-nowrap items-center gap-6 mb-8">
           <Avatar className="w-24 h-24">
             <AvatarImage src={profile.avatar_url} alt={profile.username} />
@@ -236,7 +225,6 @@ const UserProfile = () => {
         
         <Separator className="mb-6" />
         
-        {/* Tabs for different content */}
         <Tabs defaultValue="videos" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="videos">Videos</TabsTrigger>
@@ -274,7 +262,7 @@ const UserProfile = () => {
                       comments: video.comments_count,
                       immersions: video.views,
                       createdAt: video.created_at,
-                      visibility: video.visibility,
+                      visibility: video.visibility as 'public' | 'private',
                       category: video.category,
                       description: video.description
                     }}

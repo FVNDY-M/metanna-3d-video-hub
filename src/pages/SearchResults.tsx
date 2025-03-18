@@ -39,7 +39,7 @@ const SearchResults = () => {
           )
         `)
         .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`)
-        .eq('visibility', 'public')
+        .eq('visibility', 'public' as 'public' | 'private')
         .order('views', { ascending: false });
       
       if (error) throw error;
@@ -48,9 +48,9 @@ const SearchResults = () => {
         ...video,
         creator: {
           id: video.user_id,
-          username: video.profiles.username,
-          avatar: video.profiles.avatar_url,
-          subscribers: video.profiles.subscriber_count
+          username: video.profiles?.username || 'Unknown',
+          avatar: video.profiles?.avatar_url || null,
+          subscribers: video.profiles?.subscriber_count || 0
         }
       }));
     },
@@ -234,7 +234,7 @@ const SearchResults = () => {
                       comments: video.comments_count,
                       immersions: video.views,
                       createdAt: video.created_at,
-                      visibility: video.visibility,
+                      visibility: video.visibility as 'public' | 'private',
                       category: video.category,
                       description: video.description
                     }}
