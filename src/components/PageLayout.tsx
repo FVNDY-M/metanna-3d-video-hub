@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import UploadModal from './UploadModal';
-import VideoModal from './VideoModal';
+import EnvironmentModal from './EnvironmentModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -17,7 +16,6 @@ interface PageLayoutProps {
   } | null;
 }
 
-// Make TypeScript recognize the window properties
 declare global {
   interface Window {
     openUploadModal?: () => void;
@@ -40,19 +38,15 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set initial user state from props
     if (user) {
       setCurrentUser(user);
     }
   }, [user]);
 
-  // Check authentication status
   useEffect(() => {
-    // Check for current session on component mount
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        // Fetch user profile if logged in
         const { data: profileData } = await supabase
           .from('profiles')
           .select('username, avatar_url')
@@ -72,11 +66,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     
     checkSession();
     
-    // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
-          // Fetch user profile when signed in
           const { data: profileData } = await supabase
             .from('profiles')
             .select('username, avatar_url')
@@ -101,7 +93,6 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   }, []);
 
   const openUploadModal = async () => {
-    // Check if user is authenticated before opening modal
     const { data } = await supabase.auth.getSession();
     
     if (!data.session) {
@@ -131,7 +122,6 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     setSelectedVideoId(null);
   };
 
-  // Make the modal functions available globally
   React.useEffect(() => {
     window.openUploadModal = openUploadModal;
     window.openVideoModal = openVideoModal;
@@ -163,7 +153,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({
         user={currentUser}
       />
 
-      <VideoModal
+      <EnvironmentModal
         isOpen={isVideoModalOpen}
         onClose={closeVideoModal}
         videoId={selectedVideoId}
