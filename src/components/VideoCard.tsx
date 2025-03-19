@@ -103,7 +103,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, className = '' }) => {
               <span>{video.creator.username}</span>
             </Link>
             <span>·</span>
-            <span>{video.immersions.toLocaleString()} immersions</span>
+            <span>{video.immersions.toLocaleString()} views</span>
             <span>·</span>
             <span>{getTimeDifference(video.createdAt)}</span>
           </div>
