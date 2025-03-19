@@ -42,7 +42,7 @@ interface CommentData {
   };
   content: string;
   created_at: string;
-  is_pinned?: boolean;
+  is_pinned: boolean;
 }
 
 const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => {
