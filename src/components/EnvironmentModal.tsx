@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Dialog, 
@@ -134,7 +133,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             createdAt: videoData.created_at,
           });
 
-          // We'll count the view only after the user watches 50% of the video
           setViewCounted(false);
 
           if (currentUser) {
@@ -188,17 +186,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
               })
             );
             
-            // Sort comments with pinned ones at the top
-            const sortedComments = commentsWithUserData.sort((a, b) => {
-              // First sort by pinned status (pinned comments first)
-              if (a.is_pinned && !b.is_pinned) return -1;
-              if (!a.is_pinned && b.is_pinned) return 1;
-              
-              // Then sort by creation date (newer comments first)
-              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-            });
-            
-            setComments(sortedComments);
+            setComments(sortCommentsByPinned(commentsWithUserData));
           }
         }
       } catch (error) {
@@ -215,23 +203,29 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     }
   }, [isOpen, videoId, currentUser]);
 
+  const sortCommentsByPinned = (comments: CommentData[]) => {
+    return [...comments].sort((a, b) => {
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  };
+
   const handleTimeUpdate = () => {
     if (videoRef.current && !viewCounted && videoId) {
       const video = videoRef.current;
       const percentage = (video.currentTime / video.duration) * 100;
       
-      // Count view once user has watched 50% of the video
       if (percentage >= 50 && !viewCounted) {
         setViewCounted(true);
         
-        // Call the incrementVideoView function with correct videoId
         if (currentUser) {
           incrementVideoView(videoId, currentUser.id);
         } else {
           incrementVideoView(videoId);
         }
         
-        // Update UI immediately
         setVideo(prev => {
           if (!prev) return null;
           return {
@@ -274,7 +268,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     handleAuthAction(async () => {
       if (!video || !currentUser || !video.creator.id) return;
       
-      // Prevent subscribing to yourself
       if (currentUser.id === video.creator.id) {
         toast.error("You cannot subscribe to your own channel");
         return;
@@ -426,13 +419,11 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     handleAuthAction(async () => {
       if (!video || !currentUser) return;
       
-      // Check if user is the video creator
       if (video.creator.id !== currentUser.id) {
         toast.error("Only the environment creator can pin comments");
         return;
       }
       
-      // First unpin all comments if we're pinning a new comment
       if (!isPinned) {
         const { error: unpinError } = await supabase
           .from('comments')
@@ -447,7 +438,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         }
       }
       
-      // Now pin or unpin the selected comment
       const { error } = await supabase
         .from('comments')
         .update({ is_pinned: !isPinned })
@@ -459,30 +449,19 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         return;
       }
       
-      // Update local state and ensure proper sorting
       setComments(prevComments => {
-        // First set all comments to unpinned if we're pinning a new one
         let updatedComments = [...prevComments];
         if (!isPinned) {
           updatedComments = updatedComments.map(c => ({ ...c, is_pinned: false }));
         }
         
-        // Then update the status of the selected comment
         updatedComments = updatedComments.map(comment => 
           comment.id === commentId
             ? { ...comment, is_pinned: !isPinned }
             : comment
         );
         
-        // Now sort the comments with pinned ones at the top
-        return updatedComments.sort((a, b) => {
-          // First sort by pinned status (pinned comments first)
-          if (a.is_pinned && !b.is_pinned) return -1;
-          if (!a.is_pinned && b.is_pinned) return 1;
-          
-          // Then sort by creation date (newer comments first)
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
+        return sortCommentsByPinned(updatedComments);
       });
       
       toast.success(isPinned ? 'Comment unpinned' : 'Comment pinned');
@@ -493,7 +472,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
     handleAuthAction(async () => {
       if (!video || !currentUser) return;
       
-      // Check if user owns the video
       if (video.creator.id !== currentUser.id) {
         toast.error("You can only delete your own videos");
         return;
@@ -552,7 +530,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             </div>
           ) : video ? (
             <div className="flex max-h-[80vh]">
-              {/* Left side: Video and video info */}
               <div className="w-2/3 flex flex-col">
                 <div className="relative w-full aspect-video bg-black">
                   {isPlaying ? (
@@ -669,7 +646,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                 </ScrollArea>
               </div>
               
-              {/* Right side: Comments section */}
               <div className="w-1/3 border-l">
                 <ScrollArea className="h-[80vh]">
                   <div className="p-4">
