@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Dialog, 
@@ -187,12 +188,22 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
               })
             );
             
-            setComments(commentsWithUserData);
+            // Sort comments with pinned ones at the top
+            const sortedComments = commentsWithUserData.sort((a, b) => {
+              // First sort by pinned status (pinned comments first)
+              if (a.is_pinned && !b.is_pinned) return -1;
+              if (!a.is_pinned && b.is_pinned) return 1;
+              
+              // Then sort by creation date (newer comments first)
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            });
+            
+            setComments(sortedComments);
           }
         }
       } catch (error) {
-        console.error('Error fetching video details:', error);
-        toast.error('Failed to load video details');
+        console.error('Error fetching environment details:', error);
+        toast.error('Failed to load environment details');
       } finally {
         setLoading(false);
       }
@@ -374,7 +385,8 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         .insert({
           user_id: currentUser.id,
           video_id: video.id,
-          content: commentText
+          content: commentText,
+          is_pinned: false
         })
         .select('id, created_at')
         .single();
@@ -416,7 +428,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
       
       // Check if user is the video creator
       if (video.creator.id !== currentUser.id) {
-        toast.error("Only the video creator can pin comments");
+        toast.error("Only the environment creator can pin comments");
         return;
       }
       
@@ -447,7 +459,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         return;
       }
       
-      // Update local state
+      // Update local state and ensure proper sorting
       setComments(prevComments => {
         // First set all comments to unpinned if we're pinning a new one
         let updatedComments = [...prevComments];
@@ -456,11 +468,21 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         }
         
         // Then update the status of the selected comment
-        return updatedComments.map(comment => 
+        updatedComments = updatedComments.map(comment => 
           comment.id === commentId
             ? { ...comment, is_pinned: !isPinned }
             : comment
         );
+        
+        // Now sort the comments with pinned ones at the top
+        return updatedComments.sort((a, b) => {
+          // First sort by pinned status (pinned comments first)
+          if (a.is_pinned && !b.is_pinned) return -1;
+          if (!a.is_pinned && b.is_pinned) return 1;
+          
+          // Then sort by creation date (newer comments first)
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
       });
       
       toast.success(isPinned ? 'Comment unpinned' : 'Comment pinned');

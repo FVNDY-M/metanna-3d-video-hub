@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, TrendingUp, Compass, Clock, Heart, ListVideo, User, PlayCircle } from 'lucide-react';
+import { Home, TrendingUp, Compass, Clock, Heart, ListVideo, User, PlayCircle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface SidebarLink {
   icon: React.ReactNode;
@@ -68,18 +70,22 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     {
       title: 'Your Library',
       links: [
-        { icon: <PlayCircle className="h-5 w-5" />, label: 'Video History', href: '/watch-later' },
-        { icon: <Heart className="h-5 w-5" />, label: 'Liked Videos', href: '/liked' },
-        { icon: <ListVideo className="h-5 w-5" />, label: 'Your Videos', href: '/your-videos' },
+        { icon: <PlayCircle className="h-5 w-5" />, label: 'Environment History', href: '/watch-later' },
+        { icon: <Heart className="h-5 w-5" />, label: 'Liked Environments', href: '/liked' },
+        { icon: <ListVideo className="h-5 w-5" />, label: 'Your Environments', href: '/your-videos' },
       ],
     },
   ];
 
+  const handleContactClick = () => {
+    toast.info("Contact feature will be available soon!");
+  };
+
   return (
     <aside className={`hidden md:block w-56 min-w-56 h-[calc(100vh-4rem)] sticky top-16 bg-white overflow-y-auto border-r border-gray-100 ${className}`}>
-      <div className="p-4">
+      <div className="p-4 flex flex-col h-full">
         {categories.map((category, index) => (
-          <div key={index} className="mb-8 last:mb-0">
+          <div key={index} className="mb-8">
             {category.title && (
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3 px-2">
                 {category.title}
@@ -107,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         ))}
 
         {/* Popular Creators Section */}
-        <div className="mb-8 last:mb-0">
+        <div className="mb-8 flex-grow">
           <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3 px-2">
             Popular Creators
           </h3>
@@ -144,11 +150,22 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                     </Avatar>
                   </span>
                   <span>{creator.username}</span>
-                  {/* <span className="ml-auto text-xs text-gray-500">{creator.subscriber_count}</span> */}
                 </NavLink>
               ))
             )}
           </nav>
+        </div>
+        
+        {/* Contact Button */}
+        <div className="mt-auto mb-4">
+          <Button 
+            variant="outline" 
+            className="w-full flex items-center justify-center gap-2"
+            onClick={handleContactClick}
+          >
+            <Mail className="h-4 w-4" />
+            <span>Contact</span>
+          </Button>
         </div>
       </div>
     </aside>
