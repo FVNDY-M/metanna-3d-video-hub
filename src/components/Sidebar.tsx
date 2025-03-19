@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, TrendingUp, Compass, Clock, Heart, ListVideo, User } from 'lucide-react';
+import { Home, TrendingUp, Compass, Clock, Heart, ListVideo, User, PlayCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -68,7 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     {
       title: 'Your Library',
       links: [
-        { icon: <Clock className="h-5 w-5" />, label: 'Watch Later', href: '/watch-later' },
+        { icon: <PlayCircle className="h-5 w-5" />, label: 'Video History', href: '/watch-later' },
         { icon: <Heart className="h-5 w-5" />, label: 'Liked Videos', href: '/liked' },
         { icon: <ListVideo className="h-5 w-5" />, label: 'Your Videos', href: '/your-videos' },
       ],
