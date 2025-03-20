@@ -10,7 +10,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLe
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, BarChart3, TrendingUp, Clock, Heart, MessageSquare } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 import { useToast } from '@/components/ui/use-toast';
 import EmptyState from '@/components/EmptyState';
 
@@ -228,22 +228,25 @@ const VideoAnalytics = () => {
             </Button>
             <h1 className="text-2xl font-bold truncate">{videoDetails.title}</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button 
               variant={timeRange === 'week' ? 'default' : 'outline'} 
               onClick={() => setTimeRange('week')}
+              size="sm"
             >
               Last 7 days
             </Button>
             <Button 
               variant={timeRange === 'month' ? 'default' : 'outline'} 
               onClick={() => setTimeRange('month')}
+              size="sm"
             >
               Last 30 days
             </Button>
             <Button 
               variant={timeRange === 'all' ? 'default' : 'outline'} 
               onClick={() => setTimeRange('all')}
+              size="sm"
             >
               All time
             </Button>
@@ -328,28 +331,47 @@ const VideoAnalytics = () => {
               </CardHeader>
               <CardContent>
                 {chartData.length > 0 ? (
-                  <div className="h-80">
+                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
                     <ChartContainer
                       config={{
                         views: { label: 'Views', color: '#3b82f6' },
                         timeSpent: { label: 'Watch Time (min)', color: '#10b981' }
                       }}
                     >
-                      <LineChart data={chartData}>
+                      <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="period" />
-                        <YAxis yAxisId="left" />
-                        <YAxis yAxisId="right" orientation="right" />
-                        <Tooltip content={<ChartTooltipContent />} />
-                        <Legend content={<ChartLegendContent />} />
+                        <XAxis 
+                          dataKey="period" 
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis 
+                          yAxisId="left" 
+                          orientation="left" 
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fontSize: 12 }}
+                          width={40}
+                        />
+                        <YAxis 
+                          yAxisId="right" 
+                          orientation="right" 
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fontSize: 12 }}
+                          width={40}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <ChartLegend content={<ChartLegendContent />} />
                         <Line 
                           yAxisId="left"
                           type="monotone" 
                           dataKey="views" 
                           stroke="#3b82f6" 
                           strokeWidth={2} 
-                          dot={{ r: 4 }} 
-                          activeDot={{ r: 6 }} 
+                          dot={{ r: 3 }} 
+                          activeDot={{ r: 5 }} 
                         />
                         <Line 
                           yAxisId="right"
@@ -357,8 +379,8 @@ const VideoAnalytics = () => {
                           dataKey="timeSpent" 
                           stroke="#10b981" 
                           strokeWidth={2} 
-                          dot={{ r: 4 }} 
-                          activeDot={{ r: 6 }} 
+                          dot={{ r: 3 }} 
+                          activeDot={{ r: 5 }} 
                         />
                       </LineChart>
                     </ChartContainer>
@@ -382,21 +404,41 @@ const VideoAnalytics = () => {
               </CardHeader>
               <CardContent>
                 {chartData.length > 0 ? (
-                  <div className="h-80">
+                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
                     <ChartContainer
                       config={{
                         likes: { label: 'Likes', color: '#ec4899' },
                         comments: { label: 'Comments', color: '#8b5cf6' }
                       }}
                     >
-                      <BarChart data={chartData}>
+                      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="period" />
-                        <YAxis />
-                        <Tooltip content={<ChartTooltipContent />} />
-                        <Legend content={<ChartLegendContent />} />
-                        <Bar dataKey="likes" fill="#ec4899" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="comments" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                        <XAxis 
+                          dataKey="period" 
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis 
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fontSize: 12 }}
+                          width={40}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <ChartLegend content={<ChartLegendContent />} />
+                        <Bar 
+                          dataKey="likes" 
+                          fill="#ec4899" 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={20}
+                        />
+                        <Bar 
+                          dataKey="comments" 
+                          fill="#8b5cf6" 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={20}
+                        />
                       </BarChart>
                     </ChartContainer>
                   </div>
