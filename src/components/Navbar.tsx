@@ -109,7 +109,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
                   <img
                     src="/metanna_azul.png"
                     alt="Metanna Logo"
-                    className="h-10 w-auto"
+                    className="h-8 w-auto"
                   />
                 </Link>
             </div>
