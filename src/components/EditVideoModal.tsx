@@ -21,7 +21,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
-import { Image, Upload, CropIcon } from 'lucide-react';
+import { CropIcon, Upload } from 'lucide-react';
 
 interface EditVideoModalProps {
   isOpen: boolean;
