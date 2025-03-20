@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
-import { Heart, MessageSquare, Share2, Bookmark, Flag, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, MessageSquare, Share2, Bookmark, Flag, Info, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Import the mock data
 import { mockVideos } from '@/utils/mockData';
@@ -21,6 +23,7 @@ const VideoDetail = () => {
   const [comments, setComments] = useState<any[]>([]);
   const [user, setUser] = useState(null); // For demo purposes
   const [activeTab, setActiveTab] = useState('information');
+  const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
   
   // Mock comments data
   const mockComments = [
@@ -33,6 +36,7 @@ const VideoDetail = () => {
       text: 'This is absolutely mind-blowing! The detail in this AR experience is incredible.',
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
       likes: 12,
+      is_pinned: false
     },
     {
       id: '2',
@@ -43,6 +47,7 @@ const VideoDetail = () => {
       text: 'The spatial audio in this is perfect. It really helps with the immersion.',
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // 5 days ago
       likes: 8,
+      is_pinned: false
     },
     {
       id: '3',
@@ -53,8 +58,32 @@ const VideoDetail = () => {
       text: 'What hardware did you use to capture this? The tracking is so smooth!',
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 7 days ago
       likes: 5,
+      is_pinned: false
     },
   ];
+
+  useEffect(() => {
+    // Check if current user is authenticated
+    const checkCurrentUser = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (session.session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .eq('id', session.session.user.id)
+          .single();
+          
+        if (profile) {
+          setCurrentUser({
+            id: profile.id,
+            username: profile.username
+          });
+        }
+      }
+    };
+    
+    checkCurrentUser();
+  }, []);
 
   useEffect(() => {
     const fetchVideo = async () => {
@@ -67,7 +96,14 @@ const VideoDetail = () => {
           if (foundVideo) {
             setVideo(foundVideo);
             setLikeCount(foundVideo.likes);
-            setComments(mockComments);
+            
+            // Fetch the real comments if we have a video ID
+            if (id) {
+              fetchComments(id);
+            } else {
+              // Use mock comments if no real data
+              setComments(mockComments);
+            }
           }
           
           setLoading(false);
@@ -83,6 +119,63 @@ const VideoDetail = () => {
     }
   }, [id]);
 
+  const fetchComments = async (videoId: string) => {
+    try {
+      const { data: commentsData, error } = await supabase
+        .from('comments')
+        .select('id, content, created_at, user_id, is_pinned')
+        .eq('video_id', videoId)
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching comments:', error);
+        setComments(mockComments);
+        return;
+      }
+
+      if (commentsData && commentsData.length > 0) {
+        const commentsWithUserData = await Promise.all(
+          commentsData.map(async (comment) => {
+            const { data: userData } = await supabase
+              .from('profiles')
+              .select('username, avatar_url')
+              .eq('id', comment.user_id)
+              .single();
+
+            return {
+              id: comment.id,
+              user: {
+                username: userData?.username || 'Unknown User',
+                avatar: userData?.avatar_url
+              },
+              text: comment.content,
+              createdAt: comment.created_at,
+              likes: 0, // We don't track comment likes in the DB yet
+              is_pinned: comment.is_pinned || false
+            };
+          })
+        );
+        
+        setComments(sortCommentsByPinned(commentsWithUserData));
+      } else {
+        setComments(mockComments);
+      }
+    } catch (err) {
+      console.error('Error processing comments:', err);
+      setComments(mockComments);
+    }
+  };
+
+  const sortCommentsByPinned = (comments: any[]) => {
+    return [...comments].sort((a, b) => {
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  };
+
   const handleLike = () => {
     setIsLiked(!isLiked);
     setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
@@ -93,19 +186,137 @@ const VideoDetail = () => {
     
     if (!comment.trim()) return;
     
-    const newComment = {
-      id: Date.now().toString(),
-      user: {
-        username: 'You',
-        avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-      },
-      text: comment,
-      createdAt: new Date(),
-      likes: 0,
-    };
+    if (id && currentUser) {
+      // If we have a real video ID and user, save to database
+      saveComment(id, comment);
+    } else {
+      // Otherwise use mock data
+      const newComment = {
+        id: Date.now().toString(),
+        user: {
+          username: currentUser?.username || 'You',
+          avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
+        },
+        text: comment,
+        createdAt: new Date(),
+        likes: 0,
+        is_pinned: false
+      };
+      
+      setComments(prev => [newComment, ...prev]);
+      setComment('');
+    }
+  };
+
+  const saveComment = async (videoId: string, content: string) => {
+    if (!currentUser) {
+      toast.error("You need to be logged in to comment");
+      return;
+    }
     
-    setComments(prev => [newComment, ...prev]);
-    setComment('');
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          user_id: currentUser.id,
+          video_id: videoId,
+          content: content,
+          is_pinned: false
+        })
+        .select('id, created_at')
+        .single();
+        
+      if (error) {
+        toast.error('Failed to post comment');
+        console.error('Comment error:', error);
+        return;
+      }
+      
+      const newComment = {
+        id: data.id,
+        user: { 
+          username: currentUser.username,
+          avatar: undefined
+        },
+        text: content,
+        createdAt: data.created_at,
+        likes: 0,
+        is_pinned: false
+      };
+      
+      setComments(prev => [newComment, ...prev]);
+      setComment('');
+      toast.success('Comment added successfully');
+    } catch (err) {
+      console.error('Error saving comment:', err);
+      toast.error('Something went wrong');
+    }
+  };
+
+  const handlePinComment = async (commentId: string, isPinned: boolean) => {
+    if (!currentUser || !id) {
+      toast.error("You need to be logged in to pin comments");
+      return;
+    }
+    
+    try {
+      // First, get the video creator ID to check permissions
+      const { data: videoData } = await supabase
+        .from('videos')
+        .select('user_id')
+        .eq('id', id)
+        .maybeSingle();
+        
+      if (!videoData || videoData.user_id !== currentUser.id) {
+        toast.error("Only the video creator can pin comments");
+        return;
+      }
+      
+      // If we're pinning a comment, unpin all others first
+      if (!isPinned) {
+        await supabase
+          .from('comments')
+          .update({ is_pinned: false })
+          .eq('video_id', id)
+          .eq('is_pinned', true);
+      }
+      
+      // Now pin/unpin the selected comment
+      const { error } = await supabase
+        .from('comments')
+        .update({ is_pinned: !isPinned })
+        .eq('id', commentId);
+        
+      if (error) {
+        toast.error('Failed to update comment');
+        console.error('Pin/unpin error:', error);
+        return;
+      }
+      
+      // Update local state
+      setComments(prevComments => {
+        let updatedComments = [...prevComments];
+        
+        if (!isPinned) {
+          // If pinning a comment, unpin all others
+          updatedComments = updatedComments.map(c => ({...c, is_pinned: false}));
+        }
+        
+        // Update the target comment
+        updatedComments = updatedComments.map(comment => 
+          comment.id === commentId
+            ? { ...comment, is_pinned: !isPinned }
+            : comment
+        );
+        
+        return sortCommentsByPinned(updatedComments);
+      });
+      
+      toast.success(isPinned ? 'Comment unpinned' : 'Comment pinned');
+    } catch (err) {
+      console.error('Error pinning comment:', err);
+      toast.error('Something went wrong');
+    }
   };
 
   const formatRelativeTime = (date: Date | string) => {
@@ -150,6 +361,8 @@ const VideoDetail = () => {
       </PageLayout>
     );
   }
+
+  const isVideoCreator = currentUser && video.creator && currentUser.id === video.creator.id;
 
   return (
     <PageLayout user={user}>
@@ -222,144 +435,146 @@ const VideoDetail = () => {
           </div>
         </div>
         
-        <Separator className="mb-6" />
+        <Separator className="mb-4" />
         
-        {/* Tabs for Information and Comments */}
-        <Tabs 
-          defaultValue="information" 
-          value={activeTab} 
-          onValueChange={setActiveTab}
-          className="w-full"
-        >
-          <div className="flex justify-center mb-4">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="information" className="flex items-center justify-center">
-                <Info className="h-4 w-4 mr-2" />
-                Information
-              </TabsTrigger>
-              <TabsTrigger value="comments" className="flex items-center justify-center">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Comments
-              </TabsTrigger>
-            </TabsList>
+        {/* Video Stats and Section Toggle */}
+        <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center">
+              <span className="font-medium">{video.immersions.toLocaleString()}</span>
+              <span className="ml-1">views</span>
+            </div>
+            <div className="flex items-center">
+              <span className="font-medium">{likeCount.toLocaleString()}</span>
+              <span className="ml-1">likes</span>
+            </div>
+            <div className="flex items-center">
+              <span className="font-medium">{comments.length.toLocaleString()}</span>
+              <span className="ml-1">comments</span>
+            </div>
           </div>
           
-          <TabsContent value="information" className="mt-0">
-            {/* Description */}
-            <div className="mb-8 bg-gray-50 p-4 rounded-lg">
-              <p className="text-gray-700">
-                Experience an immersive augmented reality journey through this stunning virtual environment. 
-                Navigate through interactive elements and discover hidden details throughout this carefully crafted experience.
-              </p>
-              <div className="mt-3 text-sm text-gray-500">
-                <span>Published {formatRelativeTime(video.createdAt)}</span>
-              </div>
-            </div>
+          <div className="flex space-x-2">
+            <Button
+              variant={activeTab === 'information' ? 'default' : 'outline'} 
+              size="sm"
+              className={`p-2 rounded-full ${activeTab === 'information' ? 'bg-metanna-blue text-white' : ''}`}
+              onClick={() => setActiveTab('information')}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
             
-            {/* Video Stats */}
-            <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center">
-                  <span className="font-medium">{video.immersions.toLocaleString()}</span>
-                  <span className="ml-1">views</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="font-medium">{likeCount.toLocaleString()}</span>
-                  <span className="ml-1">likes</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="font-medium">{comments.length.toLocaleString()}</span>
-                  <span className="ml-1">comments</span>
+            <Button
+              variant={activeTab === 'comments' ? 'default' : 'outline'}
+              size="sm" 
+              className={`p-2 rounded-full ${activeTab === 'comments' ? 'bg-metanna-blue text-white' : ''}`}
+              onClick={() => setActiveTab('comments')}
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        
+        {/* Content Sections */}
+        <div className="mt-2">
+          {activeTab === 'information' && (
+            <div className="animate-fade-in">
+              {/* Description */}
+              <div className="mb-8 bg-gray-50 p-4 rounded-lg">
+                <p className="text-gray-700">
+                  Experience an immersive augmented reality journey through this stunning virtual environment. 
+                  Navigate through interactive elements and discover hidden details throughout this carefully crafted experience.
+                </p>
+                <div className="mt-3 text-sm text-gray-500">
+                  <span>Published {formatRelativeTime(video.createdAt)}</span>
                 </div>
               </div>
-              
-              <span>{formatRelativeTime(video.createdAt)}</span>
             </div>
-          </TabsContent>
+          )}
           
-          <TabsContent value="comments" className="mt-0">
-            {/* Comment Form */}
-            <form onSubmit={handleComment} className="mb-6">
-              <Textarea
-                placeholder="Add a comment..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="resize-none mb-3"
-              />
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  className="bg-metanna-blue hover:bg-metanna-blue/90 text-white rounded-full"
-                  disabled={!comment.trim()}
-                >
-                  Comment
-                </Button>
-              </div>
-            </form>
-            
-            {/* Comments List */}
-            <div className="space-y-4">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex space-x-3 animate-fade-in">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
-                    <AvatarFallback className="bg-metanna-blue text-white">
-                      {comment.user.username.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h4 className="font-medium text-gray-900">{comment.user.username}</h4>
-                      <span className="text-xs text-gray-500">{formatRelativeTime(comment.createdAt)}</span>
-                    </div>
-                    
-                    <p className="text-gray-700">{comment.text}</p>
-                    
-                    <div className="flex items-center space-x-4 mt-2">
-                      <button className="text-xs text-gray-500 hover:text-metanna-blue flex items-center">
-                        <Heart className="h-3.5 w-3.5 mr-1" />
-                        <span>{comment.likes}</span>
-                      </button>
-                      <button className="text-xs text-gray-500 hover:text-metanna-blue">
-                        Reply
-                      </button>
-                      <button className="text-xs text-gray-500 hover:text-metanna-blue flex items-center">
-                        <Flag className="h-3.5 w-3.5 mr-1" />
-                        Report
-                      </button>
+          {activeTab === 'comments' && (
+            <div className="animate-fade-in">
+              {/* Comment Form */}
+              <form onSubmit={handleComment} className="mb-6">
+                <Textarea
+                  placeholder="Add a comment..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  className="resize-none mb-3"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    className="bg-metanna-blue hover:bg-metanna-blue/90 text-white rounded-full"
+                    disabled={!comment.trim()}
+                  >
+                    Comment
+                  </Button>
+                </div>
+              </form>
+              
+              {/* Comments List */}
+              <div className="space-y-4">
+                {comments.map((comment) => (
+                  <div key={comment.id} className={`${comment.is_pinned ? 'bg-blue-50 p-3 border-l-4 border-metanna-blue rounded-md' : ''}`}>
+                    <div className="flex space-x-3 animate-fade-in">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={comment.user.avatar} alt={comment.user.username} />
+                        <AvatarFallback className="bg-metanna-blue text-white">
+                          {comment.user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h4 className="font-medium text-gray-900">{comment.user.username}</h4>
+                          <span className="text-xs text-gray-500">{formatRelativeTime(comment.createdAt)}</span>
+                          {comment.is_pinned && (
+                            <span className="flex items-center text-xs text-metanna-blue">
+                              <Pin className="h-3 w-3 mr-1" /> Pinned
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className="text-gray-700">{comment.text}</p>
+                        
+                        <div className="flex items-center space-x-4 mt-2">
+                          <button className="text-xs text-gray-500 hover:text-metanna-blue flex items-center">
+                            <Heart className="h-3.5 w-3.5 mr-1" />
+                            <span>{comment.likes}</span>
+                          </button>
+                          <button className="text-xs text-gray-500 hover:text-metanna-blue">
+                            Reply
+                          </button>
+                          {isVideoCreator && (
+                            <button 
+                              className={`text-xs ${comment.is_pinned ? 'text-metanna-blue' : 'text-gray-500 hover:text-metanna-blue'} flex items-center`}
+                              onClick={() => handlePinComment(comment.id, comment.is_pinned)}
+                            >
+                              <Pin className="h-3.5 w-3.5 mr-1" />
+                              {comment.is_pinned ? 'Unpin' : 'Pin'}
+                            </button>
+                          )}
+                          <button className="text-xs text-gray-500 hover:text-metanna-blue flex items-center">
+                            <Flag className="h-3.5 w-3.5 mr-1" />
+                            Report
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
         
-        {/* Tab Navigation Arrows */}
-        <div className="flex justify-center items-center mt-8 space-x-12">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className={`p-2 rounded-full ${activeTab === 'information' ? 'text-gray-400 cursor-not-allowed' : 'text-metanna-blue'}`}
-            onClick={() => setActiveTab('information')}
-            disabled={activeTab === 'information'}
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
+        {/* Section Indicator */}
+        <div className="flex justify-center mt-8">
           <div className="flex space-x-2">
             <div className={`h-2 w-2 rounded-full ${activeTab === 'information' ? 'bg-metanna-blue' : 'bg-gray-300'}`}></div>
             <div className={`h-2 w-2 rounded-full ${activeTab === 'comments' ? 'bg-metanna-blue' : 'bg-gray-300'}`}></div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className={`p-2 rounded-full ${activeTab === 'comments' ? 'text-gray-400 cursor-not-allowed' : 'text-metanna-blue'}`}
-            onClick={() => setActiveTab('comments')}
-            disabled={activeTab === 'comments'}
-          >
-            <ChevronRight className="h-6 w-6" />
-          </Button>
         </div>
       </div>
     </PageLayout>
