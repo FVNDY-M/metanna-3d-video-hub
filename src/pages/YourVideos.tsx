@@ -5,6 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
 import EditVideoModal from '@/components/EditVideoModal';
+import VideoAnalyticsPreview from '@/components/VideoAnalyticsPreview';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -162,22 +163,30 @@ const YourVideos = () => {
           ) : videos.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {videos.map((video) => (
-                <div key={video.id} className="relative">
-                  <div onClick={() => handleVideoClick(video.id)}>
-                    <VideoCard video={video} />
-                  </div>
-                  <div className="absolute top-2 right-2 flex gap-2">
-                    <Badge className={`${
-                      video.visibility === 'public' ? 'bg-green-500' : 'bg-amber-500'
-                    }`}>
-                      {video.visibility === 'public' ? 'Public' : 'Private'}
-                    </Badge>
-                    {video.category && (
-                      <Badge variant="outline" className="bg-white">
-                        {video.category}
+                <div key={video.id} className="flex flex-col">
+                  <div className="relative">
+                    <div onClick={() => handleVideoClick(video.id)}>
+                      <VideoCard video={video} />
+                    </div>
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <Badge className={`${
+                        video.visibility === 'public' ? 'bg-green-500' : 'bg-amber-500'
+                      }`}>
+                        {video.visibility === 'public' ? 'Public' : 'Private'}
                       </Badge>
-                    )}
+                      {video.category && (
+                        <Badge variant="outline" className="bg-white">
+                          {video.category}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
+                  <VideoAnalyticsPreview 
+                    videoId={video.id}
+                    views={video.immersions}
+                    likes={video.likes}
+                    comments={video.comments}
+                  />
                 </div>
               ))}
             </div>

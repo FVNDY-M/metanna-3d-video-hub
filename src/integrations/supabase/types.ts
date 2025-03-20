@@ -124,6 +124,50 @@ export type Database = {
         }
         Relationships: []
       }
+      video_analytics: {
+        Row: {
+          comments_count: number
+          created_at: string | null
+          id: string
+          likes_count: number
+          period_end: string
+          period_start: string
+          time_spent: number
+          video_id: string
+          views: number
+        }
+        Insert: {
+          comments_count?: number
+          created_at?: string | null
+          id?: string
+          likes_count?: number
+          period_end: string
+          period_start: string
+          time_spent?: number
+          video_id: string
+          views?: number
+        }
+        Update: {
+          comments_count?: number
+          created_at?: string | null
+          id?: string
+          likes_count?: number
+          period_end?: string
+          period_start?: string
+          time_spent?: number
+          video_id?: string
+          views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_analytics_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       videos: {
         Row: {
           category: string
@@ -206,6 +250,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aggregate_weekly_video_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       increment_count: {
         Args: {
           row_id: string

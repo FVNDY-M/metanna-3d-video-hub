@@ -14,6 +14,7 @@ import SearchResults from "./pages/SearchResults";
 import WatchLater from "./pages/WatchLater";
 import LikedVideos from "./pages/LikedVideos";
 import YourVideos from "./pages/YourVideos";
+import VideoAnalytics from "./pages/VideoAnalytics";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -56,6 +57,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <YourVideos />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/video-analytics/:videoId" 
+            element={
+              <ProtectedRoute>
+                <VideoAnalytics />
               </ProtectedRoute>
             } 
           />
