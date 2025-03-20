@@ -7,8 +7,7 @@ import { Heart, Share2, MessageSquare, Eye, Play, Trash2, AlertTriangle, Pin } f
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from '@/integrations/supabase/client';
-import { incrementVideoView } from '@/integrations/supabase/client';
+import { supabase, incrementVideoView, toggleCommentPinStatus } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
 import { useNavigate } from 'react-router-dom';
@@ -424,26 +423,9 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
         return;
       }
       
-      if (!isPinned) {
-        const { error: unpinError } = await supabase
-          .from('comments')
-          .update({ is_pinned: false })
-          .eq('video_id', video.id)
-          .eq('is_pinned', true);
-          
-        if (unpinError) {
-          toast.error('Failed to update pinned comments');
-          console.error('Unpin error:', unpinError);
-          return;
-        }
-      }
+      const { success, data, error } = await toggleCommentPinStatus(commentId, video.id, isPinned);
       
-      const { error } = await supabase
-        .from('comments')
-        .update({ is_pinned: !isPinned })
-        .eq('id', commentId);
-        
-      if (error) {
+      if (!success) {
         toast.error('Failed to update comment');
         console.error('Pin/unpin error:', error);
         return;

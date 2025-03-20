@@ -44,3 +44,52 @@ export const incrementVideoView = async (videoId: string, userId?: string) => {
     }
   }
 };
+
+/**
+ * Toggle the pinned status of a comment in the database
+ * @param commentId The ID of the comment to toggle
+ * @param videoId The ID of the video the comment belongs to
+ * @param currentStatus The current is_pinned status of the comment
+ * @returns An object containing success status and updated comment data if successful
+ */
+export const toggleCommentPinStatus = async (
+  commentId: string, 
+  videoId: string, 
+  currentStatus: boolean
+): Promise<{ success: boolean; data?: any; error?: any }> => {
+  try {
+    // If we're pinning a comment (current status is false), unpin all other comments first
+    if (!currentStatus) {
+      // First unpin all comments for this video
+      const { error: unpinError } = await supabase
+        .from('comments')
+        .update({ is_pinned: false })
+        .eq('video_id', videoId)
+        .eq('is_pinned', true);
+        
+      if (unpinError) {
+        console.error('Error unpinning other comments:', unpinError);
+        return { success: false, error: unpinError };
+      }
+    }
+    
+    // Now toggle the status of the target comment
+    const { data, error } = await supabase
+      .from('comments')
+      .update({ is_pinned: !currentStatus })
+      .eq('id', commentId)
+      .select('*')
+      .single();
+      
+    if (error) {
+      console.error('Error toggling comment pin status:', error);
+      return { success: false, error };
+    }
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error('Unexpected error in toggleCommentPinStatus:', error);
+    return { success: false, error };
+  }
+};
+

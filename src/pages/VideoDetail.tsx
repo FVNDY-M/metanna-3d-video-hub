@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, toggleCommentPinStatus } from '@/integrations/supabase/client';
 
 // Import the mock data
 import { mockVideos } from '@/utils/mockData';
@@ -24,8 +24,7 @@ const VideoDetail = () => {
   const [user, setUser] = useState(null); // For demo purposes
   const [activeTab, setActiveTab] = useState('information');
   const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
-  
-  // Mock comments data
+
   const mockComments = [
     {
       id: '1',
@@ -63,7 +62,6 @@ const VideoDetail = () => {
   ];
 
   useEffect(() => {
-    // Check if current user is authenticated
     const checkCurrentUser = async () => {
       const { data: session } = await supabase.auth.getSession();
       if (session.session) {
@@ -89,7 +87,6 @@ const VideoDetail = () => {
     const fetchVideo = async () => {
       setLoading(true);
       try {
-        // Simulate API call
         setTimeout(() => {
           const foundVideo = mockVideos.find(v => v.id === id);
           
@@ -97,11 +94,9 @@ const VideoDetail = () => {
             setVideo(foundVideo);
             setLikeCount(foundVideo.likes);
             
-            // Fetch the real comments if we have a video ID
             if (id) {
               fetchComments(id);
             } else {
-              // Use mock comments if no real data
               setComments(mockComments);
             }
           }
@@ -151,7 +146,7 @@ const VideoDetail = () => {
               },
               text: comment.content,
               createdAt: comment.created_at,
-              likes: 0, // We don't track comment likes in the DB yet
+              likes: 0,
               is_pinned: comment.is_pinned || false
             };
           })
@@ -187,10 +182,8 @@ const VideoDetail = () => {
     if (!comment.trim()) return;
     
     if (id && currentUser) {
-      // If we have a real video ID and user, save to database
       saveComment(id, comment);
     } else {
-      // Otherwise use mock data
       const newComment = {
         id: Date.now().toString(),
         user: {
@@ -260,7 +253,6 @@ const VideoDetail = () => {
     }
     
     try {
-      // First, get the video creator ID to check permissions
       const { data: videoData } = await supabase
         .from('videos')
         .select('user_id')
@@ -272,37 +264,21 @@ const VideoDetail = () => {
         return;
       }
       
-      // If we're pinning a comment, unpin all others first
-      if (!isPinned) {
-        await supabase
-          .from('comments')
-          .update({ is_pinned: false })
-          .eq('video_id', id)
-          .eq('is_pinned', true);
-      }
+      const { success, data, error } = await toggleCommentPinStatus(commentId, id, isPinned);
       
-      // Now pin/unpin the selected comment
-      const { error } = await supabase
-        .from('comments')
-        .update({ is_pinned: !isPinned })
-        .eq('id', commentId);
-        
-      if (error) {
+      if (!success) {
         toast.error('Failed to update comment');
         console.error('Pin/unpin error:', error);
         return;
       }
       
-      // Update local state
       setComments(prevComments => {
         let updatedComments = [...prevComments];
         
         if (!isPinned) {
-          // If pinning a comment, unpin all others
           updatedComments = updatedComments.map(c => ({...c, is_pinned: false}));
         }
         
-        // Update the target comment
         updatedComments = updatedComments.map(comment => 
           comment.id === commentId
             ? { ...comment, is_pinned: !isPinned }
@@ -367,20 +343,16 @@ const VideoDetail = () => {
   return (
     <PageLayout user={user}>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-16 animate-fade-in">
-        {/* Video Player */}
         <div className="mb-6 rounded-xl overflow-hidden shadow-md bg-black aspect-video">
           <img 
             src={video.thumbnail}
             alt={video.title}
             className="w-full h-full object-cover"
           />
-          {/* This would be replaced with an actual video player in a real app */}
         </div>
         
-        {/* Video Title */}
         <h1 className="text-2xl font-semibold text-gray-900 mb-4">{video.title}</h1>
         
-        {/* Creator Info and Action Buttons */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex items-center">
             <Link to={`/profile/${video.creator.username}`}>
@@ -437,7 +409,6 @@ const VideoDetail = () => {
         
         <Separator className="mb-4" />
         
-        {/* Video Stats and Section Toggle */}
         <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
           <div className="flex items-center space-x-6">
             <div className="flex items-center">
@@ -475,11 +446,9 @@ const VideoDetail = () => {
           </div>
         </div>
         
-        {/* Content Sections */}
         <div className="mt-2">
           {activeTab === 'information' && (
             <div className="animate-fade-in">
-              {/* Description */}
               <div className="mb-8 bg-gray-50 p-4 rounded-lg">
                 <p className="text-gray-700">
                   Experience an immersive augmented reality journey through this stunning virtual environment. 
@@ -494,7 +463,6 @@ const VideoDetail = () => {
           
           {activeTab === 'comments' && (
             <div className="animate-fade-in">
-              {/* Comment Form */}
               <form onSubmit={handleComment} className="mb-6">
                 <Textarea
                   placeholder="Add a comment..."
@@ -513,7 +481,6 @@ const VideoDetail = () => {
                 </div>
               </form>
               
-              {/* Comments List */}
               <div className="space-y-4">
                 {comments.map((comment) => (
                   <div key={comment.id} className={`${comment.is_pinned ? 'bg-blue-50 p-3 border-l-4 border-metanna-blue rounded-md' : ''}`}>
@@ -569,7 +536,6 @@ const VideoDetail = () => {
           )}
         </div>
         
-        {/* Section Indicator */}
         <div className="flex justify-center mt-8">
           <div className="flex space-x-2">
             <div className={`h-2 w-2 rounded-full ${activeTab === 'information' ? 'bg-metanna-blue' : 'bg-gray-300'}`}></div>
