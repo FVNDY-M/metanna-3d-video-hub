@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
@@ -22,7 +21,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
-import { Image, Upload } from 'lucide-react';
+import { Image, Upload, CropIcon } from 'lucide-react';
 
 interface EditVideoModalProps {
   isOpen: boolean;
@@ -65,8 +64,10 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailCropped, setThumbnailCropped] = useState<Blob | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const fetchVideoDetails = async () => {
@@ -156,7 +157,58 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     }
     
     setThumbnailFile(file);
-    setThumbnailPreview(URL.createObjectURL(file));
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const img = new Image();
+        img.onload = () => {
+          cropAndSetThumbnail(img);
+        };
+        img.src = event.target.result as string;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const cropAndSetThumbnail = (img: HTMLImageElement) => {
+    const canvas = thumbnailCanvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    canvas.width = 640;
+    canvas.height = 360;
+    
+    const aspectRatio = 16 / 9;
+    let srcWidth = img.width;
+    let srcHeight = img.height;
+    let srcX = 0;
+    let srcY = 0;
+    
+    if (img.width / img.height > aspectRatio) {
+      srcWidth = img.height * aspectRatio;
+      srcX = (img.width - srcWidth) / 2;
+    } 
+    else {
+      srcHeight = img.width / aspectRatio;
+      srcY = (img.height - srcHeight) / 2;
+    }
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      img, 
+      srcX, srcY, srcWidth, srcHeight, 
+      0, 0, canvas.width, canvas.height
+    );
+    
+    canvas.toBlob((blob) => {
+      if (blob) {
+        setThumbnailCropped(blob);
+        setThumbnailPreview(URL.createObjectURL(blob));
+      }
+    }, 'image/jpeg', 0.9);
   };
 
   const uploadThumbnail = async (): Promise<string | null> => {
@@ -164,19 +216,19 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     
     setUploadingThumbnail(true);
     try {
-      // Use uuidv4 to generate a unique filename
       const fileName = `${videoId}_${Date.now()}.${thumbnailFile.name.split('.').pop()}`;
+      
+      const thumbnailToUpload = thumbnailCropped || thumbnailFile;
       
       const { error: uploadError, data } = await supabase.storage
         .from('thumbnails')
-        .upload(fileName, thumbnailFile, {
+        .upload(fileName, thumbnailToUpload, {
           cacheControl: '3600',
           upsert: true
         });
         
       if (uploadError) throw uploadError;
       
-      // Get the public URL
       const { data: urlData } = supabase.storage
         .from('thumbnails')
         .getPublicUrl(fileName);
@@ -198,7 +250,6 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     try {
       let thumbnailUrl = null;
       
-      // Upload new thumbnail if one was selected
       if (thumbnailFile) {
         thumbnailUrl = await uploadThumbnail();
         if (!thumbnailUrl) {
@@ -244,6 +295,11 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Edit Video</DialogTitle>
         </DialogHeader>
+
+        <canvas 
+          ref={thumbnailCanvasRef} 
+          className="hidden"
+        ></canvas>
 
         {loading ? (
           <div className="flex justify-center items-center h-40">
@@ -308,31 +364,33 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
               <div className="col-span-4">
                 <Label className="block mb-2">Thumbnail</Label>
                 <div 
-                  className="aspect-video bg-black rounded-md overflow-hidden cursor-pointer relative group"
+                  className="relative cursor-pointer group"
                   onClick={handleThumbnailClick}
                 >
-                  {thumbnailPreview ? (
-                    <>
+                  <div className="aspect-video bg-black rounded-md overflow-hidden">
+                    {thumbnailPreview ? (
                       <img 
                         src={thumbnailPreview} 
                         alt={video.title}
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="text-white text-center">
-                          <Image className="h-6 w-6 mx-auto mb-1" />
-                          <span className="text-xs">Change thumbnail</span>
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center bg-gray-200">
+                        <div className="text-gray-500 text-center">
+                          <Upload className="h-6 w-6 mx-auto mb-1" />
+                          <span className="text-xs">Upload thumbnail</span>
                         </div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-gray-200">
-                      <div className="text-gray-500 text-center">
-                        <Upload className="h-6 w-6 mx-auto mb-1" />
-                        <span className="text-xs">Upload thumbnail</span>
-                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
+                    <div className="text-white text-center">
+                      <CropIcon className="h-5 w-5 mx-auto mb-1" />
+                      <p className="text-xs">Images will be cropped to 16:9</p>
                     </div>
-                  )}
+                  </div>
+                  
                   <input 
                     ref={fileInputRef}
                     type="file" 

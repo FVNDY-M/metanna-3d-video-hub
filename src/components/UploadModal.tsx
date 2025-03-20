@@ -1,12 +1,11 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Upload as UploadIcon, Image as ImageIcon, X, Check, Copy } from 'lucide-react';
+import { Upload as UploadIcon, Image as ImageIcon, X, Check, Copy, CropIcon } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
@@ -36,8 +35,11 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
   const [videoLink, setVideoLink] = useState<string | null>(null);
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'processing' | 'complete'>('idle');
   const navigate = useNavigate();
+  
+  // Thumbnail cropping refs and state
+  const thumbnailCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [thumbnailCropped, setThumbnailCropped] = useState<Blob | null>(null);
 
-  // Check if user is authenticated
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
@@ -63,7 +65,66 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     }
     
     setThumbnail(file);
-    setThumbnailPreview(URL.createObjectURL(file));
+    
+    // Create a preview and crop to 16:9 aspect ratio
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const img = new Image();
+        img.onload = () => {
+          cropAndSetThumbnail(img);
+        };
+        img.src = event.target.result as string;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const cropAndSetThumbnail = (img: HTMLImageElement) => {
+    // Create an off-screen canvas with 16:9 aspect ratio
+    const canvas = thumbnailCanvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Set canvas to 16:9 aspect ratio with reasonable size
+    canvas.width = 640;
+    canvas.height = 360;
+    
+    // Calculate cropping dimensions
+    const aspectRatio = 16 / 9;
+    let srcWidth = img.width;
+    let srcHeight = img.height;
+    let srcX = 0;
+    let srcY = 0;
+    
+    // If image is wider than 16:9, crop the sides
+    if (img.width / img.height > aspectRatio) {
+      srcWidth = img.height * aspectRatio;
+      srcX = (img.width - srcWidth) / 2;
+    } 
+    // If image is taller than 16:9, crop the top and bottom
+    else {
+      srcHeight = img.width / aspectRatio;
+      srcY = (img.height - srcHeight) / 2;
+    }
+    
+    // Clear canvas and draw the cropped image
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      img, 
+      srcX, srcY, srcWidth, srcHeight, 
+      0, 0, canvas.width, canvas.height
+    );
+    
+    // Get the cropped image as blob
+    canvas.toBlob((blob) => {
+      if (blob) {
+        setThumbnailCropped(blob);
+        setThumbnailPreview(URL.createObjectURL(blob));
+      }
+    }, 'image/jpeg', 0.9);
   };
 
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,11 +194,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     return true;
   };
 
-  const uploadToStorage = async (file: File, bucket: string, path: string) => {
+  const uploadToStorage = async (file: File | Blob, bucket: string, path: string, filename: string) => {
     try {
       // Fix: Use only alphanumeric characters, underscores, and dashes in file paths
-      // Remove any special characters from filenames and use a properly formatted path
-      const fileExt = file.name.split('.').pop();
+      const fileExt = filename.split('.').pop();
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = path ? `${path}/${fileName}` : fileName;
       
@@ -180,9 +240,23 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
       }
       
       // Use simplified file paths that don't include user IDs directly in the path
-      // Instead use unique UUIDs for the filenames
-      const thumbnailUrl = await uploadToStorage(thumbnail!, 'thumbnails', '');
-      const videoUrl = await uploadToStorage(video!, 'videos', '');
+      // Upload the cropped thumbnail if available, otherwise use the original thumbnail
+      const thumbnailToUpload = thumbnailCropped || thumbnail;
+      const thumbnailFilename = thumbnail?.name || 'thumbnail.jpg';
+      
+      const thumbnailUrl = await uploadToStorage(
+        thumbnailToUpload!, 
+        'thumbnails', 
+        '', 
+        thumbnailFilename
+      );
+      
+      const videoUrl = await uploadToStorage(
+        video!, 
+        'videos', 
+        '', 
+        video!.name
+      );
       
       // Create record in videos table
       const { data, error } = await supabase
@@ -222,6 +296,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     setDescription('');
     setThumbnail(null);
     setThumbnailPreview(null);
+    setThumbnailCropped(null);
     setVideo(null);
     setVideoName(null);
     setVideoLink(null);
@@ -247,6 +322,12 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
               {error}
             </div>
           )}
+          
+          {/* Hidden canvas for thumbnail cropping */}
+          <canvas 
+            ref={thumbnailCanvasRef} 
+            className="hidden"
+          ></canvas>
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
@@ -278,21 +359,33 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
                   <div className="space-y-2">
                     <Label className="text-gray-600">Thumbnail</Label>
                     <div 
-                      className="border border-gray-300 rounded-md bg-white h-32 flex items-center justify-center cursor-pointer overflow-hidden"
+                      className="border border-gray-300 rounded-md bg-white overflow-hidden cursor-pointer relative"
                       onClick={() => document.getElementById('thumbnail-upload')?.click()}
                     >
-                      {thumbnailPreview ? (
-                        <img 
-                          src={thumbnailPreview} 
-                          alt="Thumbnail preview" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-gray-400">
-                          <ImageIcon className="h-12 w-12 mb-2" />
-                          <span className="text-sm">Upload thumbnail</span>
+                      {/* Fixed aspect ratio container */}
+                      <div className="aspect-video relative">
+                        {thumbnailPreview ? (
+                          <img 
+                            src={thumbnailPreview} 
+                            alt="Thumbnail preview" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-gray-400 h-full">
+                            <ImageIcon className="h-12 w-12 mb-2" />
+                            <span className="text-sm">Upload thumbnail (16:9 ratio)</span>
+                          </div>
+                        )}
+                        
+                        {/* Overlay with explanation */}
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                          <div className="text-white text-center p-4">
+                            <CropIcon className="h-8 w-8 mx-auto mb-2" />
+                            <p className="text-sm">Images will be cropped to 16:9 ratio</p>
+                          </div>
                         </div>
-                      )}
+                      </div>
+                      
                       <Input
                         id="thumbnail-upload"
                         type="file"
