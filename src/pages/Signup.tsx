@@ -111,7 +111,7 @@ const Signup = () => {
       <div className="flex w-full max-w-5xl overflow-hidden rounded-3xl shadow-lg">
         {/* Left side - Blue background with logo */}
         <div className="hidden md:flex md:w-2/5 bg-metanna-blue flex-col items-center justify-center p-12 text-white">
-          <MetannaLogo variant="auth" />
+          <Link to="/"><img src="/metanna_blanco.png" alt="Metanna Logo" className="w-40" /></Link>
           <div className="mt-10 text-center">
             <h2 className="text-2xl font-semibold mb-2">Join METANNA</h2>
             <p className="text-white/80">Create an account to get started</p>
@@ -121,7 +121,7 @@ const Signup = () => {
         {/* Right side - Signup form */}
         <div className="w-full md:w-3/5 bg-white p-8 sm:p-12">
           <div className="md:hidden flex justify-center mb-6">
-            <MetannaLogo variant="auth" />
+          <Link to="/"> <img src="/metanna_azul.png" alt="Metanna Logo" className="w-40" /> </Link>
           </div>
           
           <div className="max-w-md mx-auto">

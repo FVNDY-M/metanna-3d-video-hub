@@ -32,14 +32,14 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
   useEffect(() => {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (session?.user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('username, avatar_url')
           .eq('id', session.user.id)
           .single();
-          
+
         if (profile) {
           setCurrentUser({
             username: profile.username,
@@ -61,7 +61,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
             .select('username, avatar_url')
             .eq('id', session.user.id)
             .single();
-            
+
           if (profile) {
             setCurrentUser({
               username: profile.username,
@@ -104,7 +104,14 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <MetannaLogo />
+              {/* <MetannaLogo /> */}
+                <Link to="/">
+                  <img
+                    src="/metanna_azul.png"
+                    alt="Metanna Logo"
+                    className="h-10 w-auto"
+                  />
+                </Link>
             </div>
           </div>
 
@@ -134,7 +141,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
                   >
                     <Upload className="h-5 w-5" />
                   </Button>
-                  
+
                   <Button
                     asChild
                     variant="ghost"
@@ -144,7 +151,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
                       <Bell className="h-5 w-5" />
                     </Link>
                   </Button>
-                  
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="relative rounded-full h-9 w-9 p-0 bg-metanna-blue text-white">
@@ -244,7 +251,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
                   <p className="font-medium">{activeUser.username}</p>
                 </div>
               </div>
-              
+
               <button
                 className="block p-2 rounded-lg text-base font-medium text-metanna-black hover:bg-gray-50"
                 onClick={() => {
@@ -256,7 +263,7 @@ const Navbar: React.FC<NavbarProps> = ({ user = null, onUploadClick }) => {
               >
                 Upload
               </button>
-              
+
               <Link
                 to="/notifications"
                 className="block p-2 rounded-lg text-base font-medium text-metanna-black hover:bg-gray-50"
