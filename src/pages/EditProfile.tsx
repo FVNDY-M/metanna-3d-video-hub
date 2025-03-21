@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Save, Upload, X } from 'lucide-react';
+import { Loader2, Save, Upload, X, User, Mail, AtSign } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -233,119 +233,162 @@ const EditProfile = () => {
 
   return (
     <PageLayout>
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit Profile</CardTitle>
-            <CardDescription>Update your profile information</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Avatar upload section */}
-                <div className="mb-6">
-                  <FormLabel className="block mb-2">Profile Avatar</FormLabel>
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <Avatar className="h-24 w-24">
-                        <AvatarImage src={avatarPreview || ''} alt="Avatar preview" />
-                        <AvatarFallback className="text-lg">
-                          {form.watch('username')?.charAt(0).toUpperCase() || '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      {avatarPreview && avatarFile && (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                          onClick={removeAvatar}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      )}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-metanna-black">Edit Profile</h1>
+          <p className="text-metanna-gray">Customize your profile information</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Profile Summary Card */}
+          <div className="md:col-span-1">
+            <Card className="bg-white shadow-md border-0">
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center">
+                  <div className="relative mb-4 mt-2">
+                    <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                      <AvatarImage src={avatarPreview || ''} alt="Avatar preview" />
+                      <AvatarFallback className="bg-metanna-light-blue text-white text-lg">
+                        {form.watch('username')?.charAt(0).toUpperCase() || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    {avatarPreview && avatarFile && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                        onClick={removeAvatar}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="w-full mb-4">
+                    <label className="cursor-pointer inline-flex items-center justify-center w-full">
+                      <div className="bg-metanna-light-gray hover:bg-metanna-light-blue/10 transition-colors py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center space-x-2 w-full">
+                        <Upload className="h-4 w-4 text-metanna-blue" />
+                        <span>Change Avatar</span>
+                      </div>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarChange}
+                        disabled={isUploadingAvatar}
+                      />
+                    </label>
+                    <p className="text-xs text-center text-metanna-gray mt-1">
+                      Square image, max 5MB
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3 w-full">
+                    <div className="flex items-center space-x-3 text-metanna-dark-gray">
+                      <User className="h-4 w-4 text-metanna-blue" />
+                      <span className="text-sm">{form.watch('username') || 'Username'}</span>
                     </div>
-                    <div>
-                      <label className="cursor-pointer">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <Upload className="h-4 w-4" />
-                          <span className="text-sm font-medium">Upload new avatar</span>
-                        </div>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarChange}
-                          disabled={isUploadingAvatar}
-                        />
-                        <p className="text-xs text-gray-500">Recommended: Square image, max 5MB</p>
-                      </label>
+                    <div className="flex items-center space-x-3 text-metanna-dark-gray">
+                      <Mail className="h-4 w-4 text-metanna-blue" />
+                      <span className="text-sm">{form.watch('email') || 'Email'}</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-metanna-dark-gray">
+                      <AtSign className="h-4 w-4 text-metanna-blue" />
+                      <span className="text-sm text-metanna-blue">{`@${form.watch('username')}` || '@username'}</span>
                     </div>
                   </div>
                 </div>
-                
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Username" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="bio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bio</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Tell us about yourself" 
-                          className="min-h-32"
-                          {...field} 
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input {...field} readOnly disabled className="bg-gray-100" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <div className="flex justify-end">
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading || isUploadingAvatar}
-                    className="bg-metanna-blue text-white"
-                  >
-                    {(isLoading || isUploadingAvatar) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Changes
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Profile Form */}
+          <div className="md:col-span-2">
+            <Card className="bg-white shadow-md border-0">
+              <CardHeader className="border-b pb-3">
+                <CardTitle className="text-xl font-semibold text-metanna-black">Profile Information</CardTitle>
+                <CardDescription>Update your personal details</CardDescription>
+              </CardHeader>
+              
+              <CardContent className="p-6">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <FormField
+                        control={form.control}
+                        name="username"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-metanna-dark-gray">Username</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Username" 
+                                {...field} 
+                                className="border-metanna-light-gray focus-visible:ring-metanna-blue" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-metanna-dark-gray">Email</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                readOnly 
+                                disabled 
+                                className="bg-metanna-light-gray border-metanna-light-gray cursor-not-allowed" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <FormField
+                      control={form.control}
+                      name="bio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-metanna-dark-gray">Bio</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Tell us about yourself" 
+                              className="min-h-32 border-metanna-light-gray focus-visible:ring-metanna-blue"
+                              {...field} 
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="pt-3 flex justify-end">
+                      <Button 
+                        type="submit" 
+                        disabled={isLoading || isUploadingAvatar}
+                        className="bg-metanna-blue hover:bg-metanna-blue/90 text-white px-6"
+                      >
+                        {(isLoading || isUploadingAvatar) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </PageLayout>
   );
