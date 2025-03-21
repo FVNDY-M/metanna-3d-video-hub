@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -6,9 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import VideoCard from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
-import { User, Video, Heart, Pencil } from 'lucide-react';
+import { User, Video, Heart, Pencil, BarChart3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import VideoAnalyticsPreview from '@/components/VideoAnalyticsPreview';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface ProfileData {
   id: string;
@@ -26,6 +29,12 @@ const Profile = () => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState({
+    totalViews: 0,
+    totalLikes: 0,
+    totalComments: 0,
+    totalTimeSpent: 0
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -79,6 +88,31 @@ const Profile = () => {
               immersions: video.views,
               createdAt: video.created_at
             })));
+
+            // Fetch analytics data if current user is the profile owner
+            if (session?.user && session.user.id === profiles.id) {
+              // Fetch total views, likes, comments directly from the videos table
+              const totalViews = userVideos.reduce((sum, video) => sum + (video.views || 0), 0);
+              const totalLikes = userVideos.reduce((sum, video) => sum + (video.likes_count || 0), 0);
+              const totalComments = userVideos.reduce((sum, video) => sum + (video.comments_count || 0), 0);
+              
+              // Fetch time spent from video_analytics table
+              const { data: analyticsData, error: analyticsError } = await supabase
+                .from('video_analytics')
+                .select('video_id, time_spent')
+                .in('video_id', userVideos.map(video => video.id));
+                
+              if (!analyticsError && analyticsData) {
+                const totalTimeSpent = analyticsData.reduce((sum, record) => sum + (record.time_spent || 0), 0);
+                
+                setAnalyticsData({
+                  totalViews,
+                  totalLikes,
+                  totalComments,
+                  totalTimeSpent
+                });
+              }
+            }
           }
           
           if (session?.user) {
@@ -192,6 +226,19 @@ const Profile = () => {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
+  // Function to format time in a human-readable format
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours} hr ${minutes} min`;
+    }
+    return `${minutes} min`;
+  };
+
+  const isProfileOwner = currentUser?.id === profile.id;
+
   return (
     <PageLayout>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -245,6 +292,9 @@ const Profile = () => {
           <TabsList className="mb-6">
             <TabsTrigger value="videos">Videos</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
+            {isProfileOwner && (
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            )}
           </TabsList>
           
           <TabsContent value="videos">
@@ -294,6 +344,90 @@ const Profile = () => {
               </div>
             </div>
           </TabsContent>
+          
+          {isProfileOwner && (
+            <TabsContent value="analytics">
+              <div className="max-w-3xl bg-white rounded-lg shadow-sm p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold">Channel Analytics</h2>
+                  <div className="text-sm text-gray-500">
+                    All time statistics
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500 mb-1">Total Views</span>
+                        <span className="text-2xl font-bold">{analyticsData.totalViews.toLocaleString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500 mb-1">Watch Time</span>
+                        <span className="text-2xl font-bold">{formatTime(analyticsData.totalTimeSpent)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500 mb-1">Total Likes</span>
+                        <span className="text-2xl font-bold">{analyticsData.totalLikes.toLocaleString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500 mb-1">Total Comments</span>
+                        <span className="text-2xl font-bold">{analyticsData.totalComments.toLocaleString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {videos.length > 0 && (
+                  <>
+                    <h3 className="text-lg font-medium mb-4">Videos Performance</h3>
+                    <div className="space-y-3">
+                      {videos.slice(0, 5).map((video) => (
+                        <div key={video.id} className="bg-gray-50 p-3 rounded-lg">
+                          <div className="flex flex-col sm:flex-row justify-between gap-2">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-sm mb-1 line-clamp-1">{video.title}</h4>
+                              <VideoAnalyticsPreview 
+                                videoId={video.id} 
+                                views={video.immersions} 
+                                likes={video.likes} 
+                                comments={video.comments}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {videos.length > 5 && (
+                        <div className="text-center pt-2">
+                          <Link to="/your-videos">
+                            <Button variant="outline" size="sm">
+                              View all videos
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </PageLayout>
