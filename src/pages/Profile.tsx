@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -7,11 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import VideoCard from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
-import { User, Video, Heart, Pencil, BarChart3 } from 'lucide-react';
+import { User, Video, Heart, Pencil, BarChart3, Clock, MessageSquare, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import VideoAnalyticsPreview from '@/components/VideoAnalyticsPreview';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
+import { format, parseISO, subDays } from 'date-fns';
 
 interface ProfileData {
   id: string;
@@ -35,6 +37,8 @@ const Profile = () => {
     totalComments: 0,
     totalTimeSpent: 0
   });
+  const [timelineData, setTimelineData] = useState<any[]>([]);
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('month');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -89,14 +93,11 @@ const Profile = () => {
               createdAt: video.created_at
             })));
 
-            // Fetch analytics data if current user is the profile owner
             if (session?.user && session.user.id === profiles.id) {
-              // Fetch total views, likes, comments directly from the videos table
               const totalViews = userVideos.reduce((sum, video) => sum + (video.views || 0), 0);
               const totalLikes = userVideos.reduce((sum, video) => sum + (video.likes_count || 0), 0);
               const totalComments = userVideos.reduce((sum, video) => sum + (video.comments_count || 0), 0);
               
-              // Fetch time spent from video_analytics table
               const { data: analyticsData, error: analyticsError } = await supabase
                 .from('video_analytics')
                 .select('video_id, time_spent')
@@ -111,6 +112,41 @@ const Profile = () => {
                   totalComments,
                   totalTimeSpent
                 });
+              }
+              
+              const now = new Date();
+              const lastMonth = subDays(now, 30);
+              
+              const { data: timelineAnalytics, error: timelineError } = await supabase
+                .from('video_analytics')
+                .select('*')
+                .in('video_id', userVideos.map(video => video.id))
+                .gte('period_start', lastMonth.toISOString())
+                .order('period_start', { ascending: true });
+                
+              if (!timelineError && timelineAnalytics) {
+                const groupedByPeriod = timelineAnalytics.reduce((acc, record) => {
+                  const periodKey = format(parseISO(record.period_start), 'yyyy-MM-dd');
+                  
+                  if (!acc[periodKey]) {
+                    acc[periodKey] = {
+                      period: format(parseISO(record.period_start), 'MMM dd'),
+                      views: 0,
+                      likes: 0, 
+                      comments: 0,
+                      timeSpent: 0
+                    };
+                  }
+                  
+                  acc[periodKey].views += record.views || 0;
+                  acc[periodKey].likes += record.likes_count || 0;
+                  acc[periodKey].comments += record.comments_count || 0;
+                  acc[periodKey].timeSpent += Math.round((record.time_spent || 0) / 60);
+                  
+                  return acc;
+                }, {} as Record<string, any>);
+                
+                setTimelineData(Object.values(groupedByPeriod));
               }
             }
           }
@@ -197,6 +233,27 @@ const Profile = () => {
     }
   };
 
+  const getFilteredData = () => {
+    if (!timelineData.length) return [];
+    
+    const now = new Date();
+    
+    if (timeRange === 'week') {
+      const lastWeek = subDays(now, 7);
+      const lastWeekStr = format(lastWeek, 'MMM dd');
+      return timelineData.filter(item => {
+        const itemDate = new Date(item.period);
+        return itemDate >= lastWeek;
+      });
+    } else if (timeRange === 'month') {
+      return timelineData;
+    }
+    
+    return timelineData;
+  };
+
+  const filteredTimelineData = getFilteredData();
+
   if (loading) {
     return (
       <PageLayout>
@@ -226,7 +283,6 @@ const Profile = () => {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  // Function to format time in a human-readable format
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -347,48 +403,226 @@ const Profile = () => {
           
           {isProfileOwner && (
             <TabsContent value="analytics">
-              <div className="max-w-3xl bg-white rounded-lg shadow-sm p-6">
-                <div className="flex justify-between items-center mb-6">
+              <div className="max-w-6xl bg-white rounded-lg shadow-sm p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <h2 className="text-xl font-semibold">Channel Analytics</h2>
-                  <div className="text-sm text-gray-500">
-                    All time statistics
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant={timeRange === 'week' ? 'default' : 'outline'} 
+                      onClick={() => setTimeRange('week')}
+                      size="sm"
+                    >
+                      Last 7 days
+                    </Button>
+                    <Button 
+                      variant={timeRange === 'month' ? 'default' : 'outline'} 
+                      onClick={() => setTimeRange('month')}
+                      size="sm"
+                    >
+                      Last 30 days
+                    </Button>
+                    <Button 
+                      variant={timeRange === 'all' ? 'default' : 'outline'} 
+                      onClick={() => setTimeRange('all')}
+                      size="sm"
+                    >
+                      All time
+                    </Button>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                   <Card>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-gray-500 mb-1">Total Views</span>
-                        <span className="text-2xl font-bold">{analyticsData.totalViews.toLocaleString()}</span>
-                      </div>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Views
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{analyticsData.totalViews.toLocaleString()}</div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total views in selected period
+                      </p>
                     </CardContent>
                   </Card>
                   
                   <Card>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-gray-500 mb-1">Watch Time</span>
-                        <span className="text-2xl font-bold">{formatTime(analyticsData.totalTimeSpent)}</span>
-                      </div>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Watch Time
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{formatTime(analyticsData.totalTimeSpent)}</div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total time spent watching
+                      </p>
                     </CardContent>
                   </Card>
                   
                   <Card>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-gray-500 mb-1">Total Likes</span>
-                        <span className="text-2xl font-bold">{analyticsData.totalLikes.toLocaleString()}</span>
-                      </div>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Heart className="h-4 w-4" />
+                        Likes
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{analyticsData.totalLikes.toLocaleString()}</div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total likes in selected period
+                      </p>
                     </CardContent>
                   </Card>
                   
                   <Card>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-gray-500 mb-1">Total Comments</span>
-                        <span className="text-2xl font-bold">{analyticsData.totalComments.toLocaleString()}</span>
-                      </div>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Comments
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{analyticsData.totalComments.toLocaleString()}</div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total comments in selected period
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="space-y-8 mb-8">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Views Over Time</CardTitle>
+                      <CardDescription>
+                        Tracking how your videos are performing over time
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {filteredTimelineData.length > 0 ? (
+                        <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
+                          <ChartContainer
+                            config={{
+                              views: { label: 'Views', color: '#3b82f6' },
+                              timeSpent: { label: 'Watch Time (min)', color: '#10b981' }
+                            }}
+                          >
+                            <LineChart 
+                              data={filteredTimelineData} 
+                              margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="period" 
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 12 }}
+                              />
+                              <YAxis 
+                                yAxisId="left" 
+                                orientation="left" 
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 12 }}
+                                width={40}
+                              />
+                              <YAxis 
+                                yAxisId="right" 
+                                orientation="right" 
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 12 }}
+                                width={40}
+                              />
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <ChartLegend content={<ChartLegendContent />} />
+                              <Line 
+                                yAxisId="left"
+                                type="monotone" 
+                                dataKey="views" 
+                                stroke="#3b82f6" 
+                                strokeWidth={2} 
+                                dot={{ r: 3 }} 
+                                activeDot={{ r: 5 }} 
+                              />
+                              <Line 
+                                yAxisId="right"
+                                type="monotone" 
+                                dataKey="timeSpent" 
+                                stroke="#10b981" 
+                                strokeWidth={2} 
+                                dot={{ r: 3 }} 
+                                activeDot={{ r: 5 }} 
+                              />
+                            </LineChart>
+                          </ChartContainer>
+                        </div>
+                      ) : (
+                        <div className="flex justify-center items-center h-60">
+                          <p className="text-muted-foreground">No data available for the selected period</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Engagement Metrics</CardTitle>
+                      <CardDescription>
+                        Comparing likes and comments over time
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {filteredTimelineData.length > 0 ? (
+                        <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
+                          <ChartContainer
+                            config={{
+                              likes: { label: 'Likes', color: '#ec4899' },
+                              comments: { label: 'Comments', color: '#8b5cf6' }
+                            }}
+                          >
+                            <BarChart 
+                              data={filteredTimelineData} 
+                              margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="period" 
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 12 }}
+                              />
+                              <YAxis 
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 12 }}
+                                width={40}
+                              />
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <ChartLegend content={<ChartLegendContent />} />
+                              <Bar 
+                                dataKey="likes" 
+                                fill="#ec4899" 
+                                radius={[4, 4, 0, 0]} 
+                                barSize={20}
+                              />
+                              <Bar 
+                                dataKey="comments" 
+                                fill="#8b5cf6" 
+                                radius={[4, 4, 0, 0]} 
+                                barSize={20}
+                              />
+                            </BarChart>
+                          </ChartContainer>
+                        </div>
+                      ) : (
+                        <div className="flex justify-center items-center h-60">
+                          <p className="text-muted-foreground">No data available for the selected period</p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -435,3 +669,4 @@ const Profile = () => {
 };
 
 export default Profile;
+
