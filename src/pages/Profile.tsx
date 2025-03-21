@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger, TabsHeader } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import VideoCard from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
-import { User, Video, Heart, Pencil, BarChart3, Clock, MessageSquare, TrendingUp } from 'lucide-react';
+import { User, Video, Heart, Pencil, BarChart3, Clock, MessageSquare, TrendingUp, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import VideoAnalyticsPreview from '@/components/VideoAnalyticsPreview';
@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 import { format, parseISO, subDays } from 'date-fns';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface ProfileData {
   id: string;
@@ -493,139 +494,192 @@ const Profile = () => {
                   </Card>
                 </div>
                 
-                <div className="space-y-8 mb-8">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Views Over Time</CardTitle>
-                      <CardDescription>
-                        Tracking how your videos are performing over time
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {filteredTimelineData.length > 0 ? (
-                        <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
-                          <ChartContainer
-                            config={{
-                              views: { label: 'Views', color: '#3b82f6' },
-                              timeSpent: { label: 'Watch Time (min)', color: '#10b981' }
-                            }}
-                          >
-                            <LineChart 
-                              data={filteredTimelineData} 
-                              margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis 
-                                dataKey="period" 
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 12 }}
-                              />
-                              <YAxis 
-                                yAxisId="left" 
-                                orientation="left" 
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 12 }}
-                                width={40}
-                              />
-                              <YAxis 
-                                yAxisId="right" 
-                                orientation="right" 
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 12 }}
-                                width={40}
-                              />
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                              <ChartLegend content={<ChartLegendContent />} />
-                              <Line 
-                                yAxisId="left"
-                                type="monotone" 
-                                dataKey="views" 
-                                stroke="#3b82f6" 
-                                strokeWidth={2} 
-                                dot={{ r: 3 }} 
-                                activeDot={{ r: 5 }} 
-                              />
-                              <Line 
-                                yAxisId="right"
-                                type="monotone" 
-                                dataKey="timeSpent" 
-                                stroke="#10b981" 
-                                strokeWidth={2} 
-                                dot={{ r: 3 }} 
-                                activeDot={{ r: 5 }} 
-                              />
-                            </LineChart>
-                          </ChartContainer>
-                        </div>
-                      ) : (
-                        <div className="flex justify-center items-center h-60">
-                          <p className="text-muted-foreground">No data available for the selected period</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                <Tabs defaultValue="overview" className="mb-8">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="engagement">Engagement</TabsTrigger>
+                    <TabsTrigger value="data">Raw Data</TabsTrigger>
+                  </TabsList>
                   
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Engagement Metrics</CardTitle>
-                      <CardDescription>
-                        Comparing likes and comments over time
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {filteredTimelineData.length > 0 ? (
-                        <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
-                          <ChartContainer
-                            config={{
-                              likes: { label: 'Likes', color: '#ec4899' },
-                              comments: { label: 'Comments', color: '#8b5cf6' }
-                            }}
-                          >
-                            <BarChart 
-                              data={filteredTimelineData} 
-                              margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                  <TabsContent value="overview">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Views Over Time</CardTitle>
+                        <CardDescription>
+                          Tracking how your videos are performing over time
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {filteredTimelineData.length > 0 ? (
+                          <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
+                            <ChartContainer
+                              config={{
+                                views: { label: 'Views', color: '#3b82f6' },
+                                timeSpent: { label: 'Watch Time (min)', color: '#10b981' }
+                              }}
                             >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis 
-                                dataKey="period" 
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 12 }}
-                              />
-                              <YAxis 
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 12 }}
-                                width={40}
-                              />
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                              <ChartLegend content={<ChartLegendContent />} />
-                              <Bar 
-                                dataKey="likes" 
-                                fill="#ec4899" 
-                                radius={[4, 4, 0, 0]} 
-                                barSize={20}
-                              />
-                              <Bar 
-                                dataKey="comments" 
-                                fill="#8b5cf6" 
-                                radius={[4, 4, 0, 0]} 
-                                barSize={20}
-                              />
-                            </BarChart>
-                          </ChartContainer>
-                        </div>
-                      ) : (
-                        <div className="flex justify-center items-center h-60">
-                          <p className="text-muted-foreground">No data available for the selected period</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                              <LineChart 
+                                data={filteredTimelineData} 
+                                margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis 
+                                  dataKey="period" 
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tick={{ fontSize: 12 }}
+                                />
+                                <YAxis 
+                                  yAxisId="left" 
+                                  orientation="left" 
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tick={{ fontSize: 12 }}
+                                  width={40}
+                                />
+                                <YAxis 
+                                  yAxisId="right" 
+                                  orientation="right" 
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tick={{ fontSize: 12 }}
+                                  width={40}
+                                />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <ChartLegend content={<ChartLegendContent />} />
+                                <Line 
+                                  yAxisId="left"
+                                  type="monotone" 
+                                  dataKey="views" 
+                                  stroke="#3b82f6" 
+                                  strokeWidth={2} 
+                                  dot={{ r: 3 }} 
+                                  activeDot={{ r: 5 }} 
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="timeSpent" 
+                                  stroke="#10b981" 
+                                  strokeWidth={2} 
+                                  dot={{ r: 3 }} 
+                                  activeDot={{ r: 5 }} 
+                                />
+                              </LineChart>
+                            </ChartContainer>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center items-center h-60">
+                            <p className="text-muted-foreground">No data available for the selected period</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="engagement">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Engagement Metrics</CardTitle>
+                        <CardDescription>
+                          Comparing likes and comments over time
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {filteredTimelineData.length > 0 ? (
+                          <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
+                            <ChartContainer
+                              config={{
+                                likes: { label: 'Likes', color: '#ec4899' },
+                                comments: { label: 'Comments', color: '#8b5cf6' }
+                              }}
+                            >
+                              <BarChart 
+                                data={filteredTimelineData} 
+                                margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis 
+                                  dataKey="period" 
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tick={{ fontSize: 12 }}
+                                />
+                                <YAxis 
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tick={{ fontSize: 12 }}
+                                  width={40}
+                                />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <ChartLegend content={<ChartLegendContent />} />
+                                <Bar 
+                                  dataKey="likes" 
+                                  fill="#ec4899" 
+                                  radius={[4, 4, 0, 0]} 
+                                  barSize={20}
+                                />
+                                <Bar 
+                                  dataKey="comments" 
+                                  fill="#8b5cf6" 
+                                  radius={[4, 4, 0, 0]} 
+                                  barSize={20}
+                                />
+                              </BarChart>
+                            </ChartContainer>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center items-center h-60">
+                            <p className="text-muted-foreground">No data available for the selected period</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="data">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Raw Analytics Data</CardTitle>
+                        <CardDescription>
+                          Analytics breakdown by period
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {filteredTimelineData.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Period</TableHead>
+                                  <TableHead className="text-right">Views</TableHead>
+                                  <TableHead className="text-right">Watch Time</TableHead>
+                                  <TableHead className="text-right">Likes</TableHead>
+                                  <TableHead className="text-right">Comments</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredTimelineData.map((item, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell>{item.period}</TableCell>
+                                    <TableCell className="text-right">{item.views.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{formatTime(item.timeSpent * 60)}</TableCell>
+                                    <TableCell className="text-right">{item.likes.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{item.comments.toLocaleString()}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center items-center py-8">
+                            <p className="text-muted-foreground">No data available for the selected period</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
                 
                 {videos.length > 0 && (
                   <>
