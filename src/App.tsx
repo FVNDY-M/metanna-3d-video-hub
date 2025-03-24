@@ -18,6 +18,13 @@ import VideoAnalytics from "./pages/VideoAnalytics";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
+import UserManagement from "./pages/admin/UserManagement";
+import ContentManagement from "./pages/admin/ContentManagement";
+import ModerationLogs from "./pages/admin/ModerationLogs";
+import PlatformSettings from "./pages/admin/PlatformSettings";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +85,23 @@ const App = () => (
           />
           <Route path="/creator/:username" element={<Profile />} />
           <Route path="/profile/:username" element={<Profile />} />
+          
+          {/* Admin Routes */}
+          <Route 
+            path="/admin" 
+            element={
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="videos" element={<ContentManagement />} />
+            <Route path="moderation-logs" element={<ModerationLogs />} />
+            <Route path="settings" element={<PlatformSettings />} />
+          </Route>
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
