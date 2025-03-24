@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format, parseISO, subDays } from 'date-fns';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, BarChart3, TrendingUp, Clock, Heart, MessageSquare } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import EmptyState from '@/components/EmptyState';
 
 interface VideoAnalyticsData {
@@ -179,9 +180,9 @@ const VideoAnalytics = () => {
       <PageLayout>
         <div className="max-w-6xl mx-auto px-4 py-8">
           <EmptyState 
+            icon={<BarChart3 className="h-12 w-12 text-gray-400" />}
             title="Video not found" 
             description="The requested video could not be found or you don't have permission to view its analytics."
-            icon={<BarChart3 className="h-12 w-12 text-gray-400" />}
           />
           <div className="flex justify-center mt-6">
             <Button onClick={() => navigate('/your-videos')}>
@@ -228,5 +229,193 @@ const VideoAnalytics = () => {
           </div>
         </div>
 
-        <
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Eye className="h-4 w-4" /> Views
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalViews.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Heart className="h-4 w-4" /> Likes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalLikes.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" /> Comments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalComments.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Clock className="h-4 w-4" /> Watch Time
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatTimeSpent(totalTimeSpent)}</div>
+            </CardContent>
+          </Card>
+        </div>
 
+        <Tabs defaultValue="views" className="mb-8">
+          <TabsList className="mb-4">
+            <TabsTrigger value="views">Views</TabsTrigger>
+            <TabsTrigger value="engagement">Engagement</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="views" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Views Over Time</CardTitle>
+                <CardDescription>
+                  Daily view count for {timeRange === 'week' ? 'the last 7 days' : timeRange === 'month' ? 'the last 30 days' : 'all time'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  {chartData.length > 0 ? (
+                    <ChartContainer>
+                      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line type="monotone" dataKey="views" stroke="#8884d8" name="Views" />
+                      </LineChart>
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </ChartContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No data available for the selected time period</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Watch Time</CardTitle>
+                <CardDescription>
+                  Total minutes watched per day
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  {chartData.length > 0 ? (
+                    <ChartContainer>
+                      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="timeSpent" fill="#82ca9d" name="Minutes Watched" />
+                      </BarChart>
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </ChartContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No data available for the selected time period</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="engagement" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Likes & Comments</CardTitle>
+                <CardDescription>
+                  Engagement metrics over time
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  {chartData.length > 0 ? (
+                    <ChartContainer>
+                      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line type="monotone" dataKey="likes" stroke="#ff7300" name="Likes" />
+                        <Line type="monotone" dataKey="comments" stroke="#387908" name="Comments" />
+                      </LineChart>
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </ChartContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No data available for the selected time period</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Engagement Rate</CardTitle>
+                <CardDescription>
+                  Likes and comments per view
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Metric</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Per 100 Views</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Likes</TableCell>
+                      <TableCell>{totalLikes.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {totalViews > 0 
+                          ? ((totalLikes / totalViews) * 100).toFixed(2) 
+                          : '0.00'}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Comments</TableCell>
+                      <TableCell>{totalComments.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {totalViews > 0 
+                          ? ((totalComments / totalViews) * 100).toFixed(2) 
+                          : '0.00'}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </PageLayout>
+  );
+};
+
+export default VideoAnalytics;
