@@ -29,11 +29,17 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, subDays } from 'date-fns';
 import AdminLayout from '@/components/AdminLayout';
 
+// Define DateRange type to match the Calendar component's expected type
+type DateRange = {
+  from: Date | undefined;
+  to: Date | undefined;
+};
+
 const ModerationLogs = () => {
   // States for filters
   const [actionTypeFilter, setActionTypeFilter] = useState<string>('all');
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<{from: Date | undefined, to: Date | undefined}>({
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 7),
     to: new Date(),
   });
@@ -73,7 +79,7 @@ const ModerationLogs = () => {
         .from('moderation_actions')
         .select(`
           *,
-          admin:profiles!admin_id(username, avatar_url)
+          admin:profiles(username, avatar_url)
         `)
         .order('created_at', { ascending: false });
       
@@ -208,8 +214,16 @@ const ModerationLogs = () => {
               mode="range"
               defaultMonth={dateRange.from}
               selected={dateRange}
-              onSelect={(range) => setDateRange(range || { from: undefined, to: undefined })}
+              onSelect={(range) => {
+                // Only update if range exists, otherwise set to default
+                if (range) {
+                  setDateRange(range);
+                } else {
+                  setDateRange({ from: undefined, to: undefined });
+                }
+              }}
               numberOfMonths={2}
+              className="pointer-events-auto"
             />
           </PopoverContent>
         </Popover>

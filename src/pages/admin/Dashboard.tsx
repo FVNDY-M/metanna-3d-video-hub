@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Film, Users, Heart, MessageSquare, Eye, Clock } from 'lucide-react';
+import { Film, Users, Heart, MessageSquare, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -25,7 +25,10 @@ const AdminDashboard = () => {
         supabase.from('comments').select('*', { count: 'exact', head: true }),
         supabase
           .from('moderation_actions')
-          .select('*, admin:profiles!admin_id(username)')
+          .select(`
+            *,
+            admin:profiles(username)
+          `)
           .order('created_at', { ascending: false })
           .limit(5)
       ]);

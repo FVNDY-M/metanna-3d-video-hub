@@ -49,7 +49,7 @@ const VideoManagement = () => {
         .from('videos')
         .select(`
           *,
-          user:profiles!user_id(username, avatar_url)
+          user:profiles(username, avatar_url)
         `)
         .order('created_at', { ascending: false });
       
@@ -75,7 +75,7 @@ const VideoManagement = () => {
   const filteredVideos = videos?.filter(video => 
     video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     video.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    video.user?.username.toLowerCase().includes(searchQuery.toLowerCase())
+    video.user?.username?.toLowerCase().includes(searchQuery.toLowerCase() || '')
   );
   
   // Handle video suspension/restoration
