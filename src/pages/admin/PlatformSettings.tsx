@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
@@ -57,25 +58,26 @@ const PlatformSettingsPage: React.FC = () => {
       if (error) throw error;
       
       if (data) {
-        // Safely cast the JSON data with proper type checking
-        const uploadLimits = data.upload_limits as unknown;
-        const moderationSettings = data.moderation_settings as unknown;
+        // Parse the JSON data from setting_value
+        const settingsData = data.setting_value as Json;
         
-        setSettings({
-          upload_limits: typeof uploadLimits === 'object' && uploadLimits 
-            ? uploadLimits as UploadLimits 
-            : settings.upload_limits,
-          moderation_settings: typeof moderationSettings === 'object' && moderationSettings 
-            ? moderationSettings as ModerationSettings
-            : settings.moderation_settings
-        });
+        if (typeof settingsData === 'object' && settingsData !== null) {
+          const uploadLimits = (settingsData as any).upload_limits;
+          const moderationSettings = (settingsData as any).moderation_settings;
+          
+          setSettings({
+            upload_limits: typeof uploadLimits === 'object' && uploadLimits 
+              ? uploadLimits as UploadLimits 
+              : settings.upload_limits,
+            moderation_settings: typeof moderationSettings === 'object' && moderationSettings 
+              ? moderationSettings as ModerationSettings
+              : settings.moderation_settings
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load platform settings"
-      });
+      toast("Failed to load platform settings");
     } finally {
       setLoading(false);
     }
@@ -87,23 +89,16 @@ const PlatformSettingsPage: React.FC = () => {
       const { error } = await supabase
         .from('platform_settings')
         .update({
-          upload_limits: settings.upload_limits as unknown as Json,
-          moderation_settings: settings.moderation_settings as unknown as Json
+          setting_value: settings as unknown as Json
         })
         .eq('id', 1);
         
       if (error) throw error;
       
-      toast({
-        title: "Settings saved",
-        description: "Platform settings have been updated successfully"
-      });
+      toast("Platform settings have been updated successfully");
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save platform settings"
-      });
+      toast("Failed to save platform settings");
     } finally {
       setSaving(false);
     }
@@ -124,7 +119,7 @@ const PlatformSettingsPage: React.FC = () => {
     const { name, value, type, checked } = e.target;
     
     setSettings(prevSettings => {
-      if (type === 'switch') {
+      if (type === 'checkbox') {
         return {
           ...prevSettings,
           moderation_settings: {

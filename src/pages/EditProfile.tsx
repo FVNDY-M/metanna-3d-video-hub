@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,22 +34,14 @@ const EditProfile = () => {
 
         if (error) {
           console.error('Error fetching profile:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load profile data",
-            variant: "destructive"
-          });
+          toast("Failed to load profile data");
         } else if (profile) {
           setUsername(profile.username || '');
           setAvatarUrl(profile.avatar_url || null);
         }
       } catch (error) {
         console.error('Unexpected error:', error);
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred",
-          variant: "destructive"
-        });
+        toast("An unexpected error occurred");
       } finally {
         setLoading(false);
       }
@@ -71,7 +64,7 @@ const EditProfile = () => {
         id: session.user.id,
         username: username,
         avatar_url: avatarUrl,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(), // Convert Date to ISO string
       };
 
       const { error } = await supabase.from('profiles').upsert(updates, {
@@ -80,25 +73,14 @@ const EditProfile = () => {
 
       if (error) {
         console.error('Error updating profile:', error);
-        toast({
-          title: "Error",
-          description: "Failed to update profile",
-          variant: "destructive"
-        });
+        toast("Failed to update profile");
       } else {
-        toast({
-          title: "Profile updated",
-          description: "Your profile has been updated successfully",
-        });
+        toast("Your profile has been updated successfully");
         navigate(`/profile/${username}`);
       }
     } catch (error) {
       console.error('Unexpected error:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive"
-      });
+      toast("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
@@ -131,26 +113,15 @@ const EditProfile = () => {
 
           if (uploadError) {
             console.error('Error uploading avatar:', uploadError);
-            toast({
-              title: "Error",
-              description: "Failed to upload avatar",
-              variant: "destructive"
-            });
+            toast("Failed to upload avatar");
           } else {
             const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${filePath}`;
             setAvatarUrl(publicUrl);
-            toast({
-              title: "Avatar updated",
-              description: "Your avatar has been updated successfully",
-            });
+            toast("Your avatar has been updated successfully");
           }
         } catch (error) {
           console.error('Unexpected error:', error);
-          toast({
-            title: "Error",
-            description: "An unexpected error occurred during avatar upload",
-            variant: "destructive"
-          });
+          toast("An unexpected error occurred during avatar upload");
         } finally {
           setLoading(false);
         }
