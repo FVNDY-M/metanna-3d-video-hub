@@ -74,10 +74,7 @@ const ModerationLogs = () => {
     queryFn: async () => {
       let query = supabase
         .from('moderation_actions')
-        .select(`
-          *,
-          admin:profiles(username, avatar_url)
-        `)
+        .select('*, admin_id')
         .order('created_at', { ascending: false });
       
       // Apply action type filter
@@ -106,6 +103,32 @@ const ModerationLogs = () => {
       if (error) {
         console.error("Error fetching moderation logs:", error);
         throw new Error("Failed to fetch moderation logs");
+      }
+
+      // If we have log data, fetch the admin usernames in a separate query
+      if (data && data.length > 0) {
+        // Get unique admin IDs
+        const adminIds = [...new Set(data.map(log => log.admin_id))];
+        
+        // Fetch admin profiles
+        const { data: adminProfiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', adminIds);
+          
+        if (profilesError) {
+          console.error("Error fetching admin profiles:", profilesError);
+          return data; // Return logs without admin info if there's an error
+        }
+        
+        // Map admin usernames to logs
+        return data.map(log => {
+          const adminProfile = adminProfiles?.find(profile => profile.id === log.admin_id);
+          return {
+            ...log,
+            admin: adminProfile || { username: 'Unknown' }
+          };
+        });
       }
       
       return data || [];

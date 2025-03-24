@@ -25,7 +25,7 @@ const AdminDashboard = () => {
         supabase.from('comments').select('*', { count: 'exact', head: true }),
         supabase
           .from('moderation_actions')
-          .select('*, admin:profiles(username)')
+          .select('*, admin_id')
           .order('created_at', { ascending: false })
           .limit(5)
       ]);
@@ -45,6 +45,32 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch views statistics");
       }
 
+      // If we have admin actions, fetch the admin usernames separately
+      let actionsWithAdmins = [];
+      if (recentActions && recentActions.length > 0) {
+        // Get unique admin IDs
+        const adminIds = [...new Set(recentActions.map(action => action.admin_id))];
+        
+        // Fetch admin profiles
+        const { data: adminProfiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', adminIds);
+          
+        if (profilesError) {
+          console.error("Error fetching admin profiles:", profilesError);
+        }
+        
+        // Map admin usernames to actions
+        actionsWithAdmins = recentActions.map(action => {
+          const adminProfile = adminProfiles?.find(profile => profile.id === action.admin_id);
+          return {
+            ...action,
+            admin: adminProfile || { username: 'Unknown' }
+          };
+        });
+      }
+
       const totalViews = videosData.reduce((sum, video) => sum + (video.views || 0), 0);
       
       return {
@@ -54,7 +80,7 @@ const AdminDashboard = () => {
         totalComments: totalComments,
         totalViews: totalViews,
         totalInteractions: totalLikes + totalComments + totalViews,
-        recentActions: recentActions || []
+        recentActions: actionsWithAdmins || []
       };
     },
     refetchInterval: 60000, // Refetch every minute

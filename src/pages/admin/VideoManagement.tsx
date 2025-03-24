@@ -45,12 +45,10 @@ const VideoManagement = () => {
   const { data: videos, isLoading, refetch } = useQuery({
     queryKey: ['admin-videos', statusFilter],
     queryFn: async () => {
+      // First, fetch videos
       let query = supabase
         .from('videos')
-        .select(`
-          *,
-          user:profiles(username, avatar_url)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       // Apply status filter
@@ -60,23 +58,49 @@ const VideoManagement = () => {
         query = query.eq('is_suspended', false);
       }
       
-      const { data, error } = await query;
+      const { data: videoData, error } = await query;
       
       if (error) {
         console.error("Error fetching videos:", error);
         throw new Error("Failed to fetch videos");
       }
       
-      return data || [];
+      if (!videoData || videoData.length === 0) {
+        return [];
+      }
+      
+      // Then, fetch user profiles separately
+      const userIds = [...new Set(videoData.map(video => video.user_id))];
+      
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+        
+      if (profilesError) {
+        console.error("Error fetching user profiles:", profilesError);
+        // Return videos without user info if there's an error
+        return videoData;
+      }
+      
+      // Combine videos with user info
+      return videoData.map(video => ({
+        ...video,
+        user: userProfiles.find(profile => profile.id === video.user_id) || { username: 'Unknown' }
+      }));
     }
   });
   
   // Filtered videos based on search query
-  const filteredVideos = videos?.filter(video => 
-    video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    video.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    video.user?.username?.toLowerCase().includes(searchQuery.toLowerCase() || '')
-  );
+  const filteredVideos = React.useMemo(() => {
+    if (!videos) return [];
+    
+    return videos.filter(video => 
+      video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (video.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (video.user?.username || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [videos, searchQuery]);
   
   // Handle video suspension/restoration
   const handleToggleSuspension = async () => {
@@ -240,7 +264,7 @@ const VideoManagement = () => {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-4 border-metanna-blue border-t-transparent rounded-full"></div>
         </div>
-      ) : filteredVideos?.length === 0 ? (
+      ) : filteredVideos.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <h3 className="text-lg font-medium text-gray-600 mb-1">No videos found</h3>
           <p className="text-gray-500 text-sm">Try adjusting your search or filter criteria</p>
@@ -259,7 +283,7 @@ const VideoManagement = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredVideos?.map((video) => (
+              {filteredVideos.map((video) => (
                 <TableRow key={video.id} className={video.is_suspended ? "bg-red-50" : ""}>
                   <TableCell className="font-medium max-w-[200px] truncate">
                     {video.title}
