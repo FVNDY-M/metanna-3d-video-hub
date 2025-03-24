@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, TrendingUp, Compass, Clock, Heart, ListVideo, User, PlayCircle, Mail } from 'lucide-react';
+import { Home, TrendingUp, Compass, Clock, Heart, ListVideo, User, PlayCircle, Mail, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const [popularCreators, setPopularCreators] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchPopularCreators = async () => {
@@ -56,7 +57,35 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
       }
     };
 
+    const checkAdminStatus = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (!sessionData.session) {
+          setIsAdmin(false);
+          return;
+        }
+        
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', sessionData.session.user.id)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching admin status:', error);
+          setIsAdmin(false);
+        } else {
+          setIsAdmin(profileData?.role === 'admin');
+        }
+      } catch (error) {
+        console.error('Error in admin check:', error);
+        setIsAdmin(false);
+      }
+    };
+
     fetchPopularCreators();
+    checkAdminStatus();
   }, []);
 
   const categories: SidebarCategory[] = [
@@ -75,6 +104,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         { icon: <ListVideo className="h-5 w-5" />, label: 'Your Environments', href: '/your-videos' },
       ],
     },
+    // Add admin section if user is admin
+    ...(isAdmin ? [{
+      title: 'Admin',
+      links: [
+        { icon: <Settings className="h-5 w-5" />, label: 'Admin Panel', href: '/admin' },
+      ],
+    }] : []),
   ];
 
   const handleContactClick = () => {

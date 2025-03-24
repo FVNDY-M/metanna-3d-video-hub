@@ -73,12 +73,68 @@ export type Database = {
           },
         ]
       }
+      moderation_actions: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           bio: string | null
           created_at: string
           id: string
+          is_suspended: boolean | null
+          role: string | null
           subscriber_count: number
           updated_at: string
           username: string
@@ -88,6 +144,8 @@ export type Database = {
           bio?: string | null
           created_at?: string
           id: string
+          is_suspended?: boolean | null
+          role?: string | null
           subscriber_count?: number
           updated_at?: string
           username: string
@@ -97,6 +155,8 @@ export type Database = {
           bio?: string | null
           created_at?: string
           id?: string
+          is_suspended?: boolean | null
+          role?: string | null
           subscriber_count?: number
           updated_at?: string
           username?: string
@@ -175,6 +235,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_suspended: boolean | null
           likes_count: number
           thumbnail_url: string | null
           title: string
@@ -190,6 +251,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_suspended?: boolean | null
           likes_count?: number
           thumbnail_url?: string | null
           title: string
@@ -205,6 +267,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_suspended?: boolean | null
           likes_count?: number
           thumbnail_url?: string | null
           title?: string
