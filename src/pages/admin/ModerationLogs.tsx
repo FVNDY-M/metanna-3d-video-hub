@@ -29,11 +29,8 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, subDays } from 'date-fns';
 import AdminLayout from '@/components/AdminLayout';
 
-// Define DateRange type to match the Calendar component's expected type
-type DateRange = {
-  from: Date | undefined;
-  to: Date | undefined;
-};
+// Import DateRange type from react-day-picker
+import { DateRange } from 'react-day-picker';
 
 const ModerationLogs = () => {
   // States for filters
@@ -214,14 +211,7 @@ const ModerationLogs = () => {
               mode="range"
               defaultMonth={dateRange.from}
               selected={dateRange}
-              onSelect={(range) => {
-                // Only update if range exists, otherwise set to default
-                if (range) {
-                  setDateRange(range);
-                } else {
-                  setDateRange({ from: undefined, to: undefined });
-                }
-              }}
+              onSelect={setDateRange}
               numberOfMonths={2}
               className="pointer-events-auto"
             />

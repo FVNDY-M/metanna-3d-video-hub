@@ -25,10 +25,7 @@ const AdminDashboard = () => {
         supabase.from('comments').select('*', { count: 'exact', head: true }),
         supabase
           .from('moderation_actions')
-          .select(`
-            *,
-            admin:profiles(username)
-          `)
+          .select('*, admin:profiles(username)')
           .order('created_at', { ascending: false })
           .limit(5)
       ]);
