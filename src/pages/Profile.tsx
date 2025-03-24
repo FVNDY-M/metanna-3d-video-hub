@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import VideoCard from '@/components/VideoCard';
 import PageLayout from '@/components/PageLayout';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger, TabsHeader } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import VideoCard from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
-import { toast } from '@/components/ui/use-toast';
-import { UserCheck, Video, Users, Edit } from 'lucide-react';
+import { User, Video, Heart, Pencil, BarChart3, Clock, MessageSquare, TrendingUp, Database } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import VideoAnalyticsPreview from '@/components/VideoAnalyticsPreview';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
+import { format, parseISO, subDays } from 'date-fns';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface ProfileData {
   id: string;
@@ -35,6 +40,7 @@ const Profile = () => {
   });
   const [timelineData, setTimelineData] = useState<any[]>([]);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('month');
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchProfileAndVideos = async () => {
@@ -173,7 +179,11 @@ const Profile = () => {
 
   const handleSubscribe = async () => {
     if (!currentUser) {
-      toast("Authentication required");
+      toast({
+        title: "Authentication required",
+        description: "Please log in to subscribe to creators",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -192,7 +202,10 @@ const Profile = () => {
         setIsSubscribed(false);
         setProfile(prev => prev ? {...prev, subscriber_count: Math.max(0, prev.subscriber_count - 1)} : null);
         
-        toast("Unsubscribed", { description: `You've unsubscribed from ${profile?.username}` });
+        toast({
+          title: "Unsubscribed",
+          description: `You've unsubscribed from ${profile?.username}`
+        });
       } else {
         const { error } = await supabase
           .from('subscriptions')
@@ -206,11 +219,18 @@ const Profile = () => {
         setIsSubscribed(true);
         setProfile(prev => prev ? {...prev, subscriber_count: prev.subscriber_count + 1} : null);
         
-        toast("Subscribed", { description: `You've subscribed to ${profile?.username}` });
+        toast({
+          title: "Subscribed",
+          description: `You've subscribed to ${profile?.username}`
+        });
       }
     } catch (error) {
       console.error('Error updating subscription:', error);
-      toast("Error", { description: "There was an error updating your subscription" });
+      toast({
+        title: "Error",
+        description: "There was an error updating your subscription",
+        variant: "destructive"
+      });
     }
   };
 
@@ -252,7 +272,7 @@ const Profile = () => {
           <EmptyState 
             title="User not found" 
             description="The user you are looking for does not exist."
-            icon={<UserCheck className="h-12 w-12 text-gray-400" />}
+            icon={<User className="h-12 w-12 text-gray-400" />}
           />
         </div>
       </PageLayout>
@@ -315,7 +335,7 @@ const Profile = () => {
                       variant="outline" 
                       className="rounded-full border-metanna-blue text-metanna-blue"
                     >
-                      <Edit className="h-4 w-4 mr-2" />
+                      <Pencil className="h-4 w-4 mr-2" />
                       Edit Profile
                     </Button>
                   </Link>
@@ -703,3 +723,4 @@ const Profile = () => {
 };
 
 export default Profile;
+
