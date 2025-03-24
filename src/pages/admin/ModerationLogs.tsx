@@ -32,6 +32,23 @@ import AdminLayout from '@/components/AdminLayout';
 // Import DateRange type from react-day-picker
 import { DateRange } from 'react-day-picker';
 
+// Define typed interfaces for our data
+interface AdminProfile {
+  id: string;
+  username: string;
+}
+
+interface ModerationLog {
+  id: string;
+  action_type: string;
+  target_type: string;
+  target_id: string;
+  admin_id: string;
+  created_at: string;
+  details: any;
+  admin?: AdminProfile;
+}
+
 const ModerationLogs = () => {
   // States for filters
   const [actionTypeFilter, setActionTypeFilter] = useState<string>('all');
@@ -40,7 +57,7 @@ const ModerationLogs = () => {
     from: subDays(new Date(), 7),
     to: new Date(),
   });
-  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [selectedLog, setSelectedLog] = useState<ModerationLog | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   
   // Format date for display
@@ -74,7 +91,7 @@ const ModerationLogs = () => {
     queryFn: async () => {
       let query = supabase
         .from('moderation_actions')
-        .select('*, admin_id')
+        .select('*')
         .order('created_at', { ascending: false });
       
       // Apply action type filter
@@ -118,7 +135,8 @@ const ModerationLogs = () => {
           
         if (profilesError) {
           console.error("Error fetching admin profiles:", profilesError);
-          return data; // Return logs without admin info if there's an error
+          // Return logs without admin info if there's an error
+          return data as ModerationLog[];
         }
         
         // Map admin usernames to logs
@@ -126,12 +144,12 @@ const ModerationLogs = () => {
           const adminProfile = adminProfiles?.find(profile => profile.id === log.admin_id);
           return {
             ...log,
-            admin: adminProfile || { username: 'Unknown' }
+            admin: adminProfile || { id: log.admin_id, username: 'Unknown' }
           };
-        });
+        }) as ModerationLog[];
       }
       
-      return data || [];
+      return data as ModerationLog[] || [];
     }
   });
   
@@ -143,13 +161,13 @@ const ModerationLogs = () => {
   }, [logs]);
   
   // View details for a log entry
-  const viewLogDetails = (log: any) => {
+  const viewLogDetails = (log: ModerationLog) => {
     setSelectedLog(log);
     setIsDetailsOpen(true);
   };
   
   // Render target link based on target type
-  const renderTargetLink = (log: any) => {
+  const renderTargetLink = (log: ModerationLog | null) => {
     if (!log) return null;
     
     switch (log.target_type) {

@@ -7,6 +7,33 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import AdminLayout from '@/components/AdminLayout';
 
+// Define interfaces for our data
+interface AdminProfile {
+  id: string;
+  username: string;
+}
+
+interface ModerationAction {
+  id: string;
+  action_type: string;
+  target_type: string;
+  target_id: string;
+  admin_id: string;
+  created_at: string;
+  details: any;
+  admin?: AdminProfile;
+}
+
+interface DashboardStats {
+  totalVideos: number;
+  totalUsers: number;
+  totalLikes: number;
+  totalComments: number;
+  totalViews: number;
+  totalInteractions: number;
+  recentActions: ModerationAction[];
+}
+
 const AdminDashboard = () => {
   const { data: statsData, isLoading: isStatsLoading } = useQuery({
     queryKey: ['admin-dashboard-stats'],
@@ -25,7 +52,7 @@ const AdminDashboard = () => {
         supabase.from('comments').select('*', { count: 'exact', head: true }),
         supabase
           .from('moderation_actions')
-          .select('*, admin_id')
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(5)
       ]);
@@ -46,7 +73,7 @@ const AdminDashboard = () => {
       }
 
       // If we have admin actions, fetch the admin usernames separately
-      let actionsWithAdmins = [];
+      let actionsWithAdmins: ModerationAction[] = [];
       if (recentActions && recentActions.length > 0) {
         // Get unique admin IDs
         const adminIds = [...new Set(recentActions.map(action => action.admin_id))];
@@ -59,16 +86,17 @@ const AdminDashboard = () => {
           
         if (profilesError) {
           console.error("Error fetching admin profiles:", profilesError);
+          actionsWithAdmins = recentActions as ModerationAction[];
+        } else {
+          // Map admin usernames to actions
+          actionsWithAdmins = recentActions.map(action => {
+            const adminProfile = adminProfiles?.find(profile => profile.id === action.admin_id);
+            return {
+              ...action,
+              admin: adminProfile || { id: action.admin_id, username: 'Unknown' }
+            };
+          }) as ModerationAction[];
         }
-        
-        // Map admin usernames to actions
-        actionsWithAdmins = recentActions.map(action => {
-          const adminProfile = adminProfiles?.find(profile => profile.id === action.admin_id);
-          return {
-            ...action,
-            admin: adminProfile || { username: 'Unknown' }
-          };
-        });
       }
 
       const totalViews = videosData.reduce((sum, video) => sum + (video.views || 0), 0);
@@ -80,8 +108,8 @@ const AdminDashboard = () => {
         totalComments: totalComments,
         totalViews: totalViews,
         totalInteractions: totalLikes + totalComments + totalViews,
-        recentActions: actionsWithAdmins || []
-      };
+        recentActions: actionsWithAdmins
+      } as DashboardStats;
     },
     refetchInterval: 60000, // Refetch every minute
   });

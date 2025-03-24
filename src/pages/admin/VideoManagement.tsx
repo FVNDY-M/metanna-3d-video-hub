@@ -26,13 +26,38 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/AdminLayout';
 
+// Define interfaces for our data
+interface UserProfile {
+  id: string;
+  username: string;
+  avatar_url?: string;
+}
+
+interface Video {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  views: number;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  visibility: string;
+  is_suspended: boolean;
+  user?: UserProfile;
+}
+
 const VideoManagement = () => {
   // States for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
   // States for modals
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   
@@ -66,7 +91,7 @@ const VideoManagement = () => {
       }
       
       if (!videoData || videoData.length === 0) {
-        return [];
+        return [] as Video[];
       }
       
       // Then, fetch user profiles separately
@@ -80,14 +105,14 @@ const VideoManagement = () => {
       if (profilesError) {
         console.error("Error fetching user profiles:", profilesError);
         // Return videos without user info if there's an error
-        return videoData;
+        return videoData as Video[];
       }
       
       // Combine videos with user info
       return videoData.map(video => ({
         ...video,
-        user: userProfiles.find(profile => profile.id === video.user_id) || { username: 'Unknown' }
-      }));
+        user: userProfiles.find(profile => profile.id === video.user_id) || { id: video.user_id, username: 'Unknown' }
+      })) as Video[];
     }
   });
   
@@ -202,7 +227,7 @@ const VideoManagement = () => {
   };
   
   // Open edit dialog and set form values
-  const openEditDialog = (video: any) => {
+  const openEditDialog = (video: Video) => {
     setSelectedVideo(video);
     setEditTitle(video.title);
     setEditDescription(video.description || '');
@@ -211,7 +236,7 @@ const VideoManagement = () => {
   };
   
   // Open suspend/restore dialog
-  const openSuspendDialog = (video: any) => {
+  const openSuspendDialog = (video: Video) => {
     setSelectedVideo(video);
     setIsSuspendDialogOpen(true);
   };
