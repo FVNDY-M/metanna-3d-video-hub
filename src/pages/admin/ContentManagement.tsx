@@ -12,6 +12,11 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
+interface VideoProfile {
+  username: string;
+  avatar_url: string | null;
+}
+
 interface Video {
   id: string;
   title: string;
@@ -23,10 +28,7 @@ interface Video {
   user_id: string;
   created_at: string;
   is_suspended: boolean;
-  profiles?: {
-    username: string;
-    avatar_url: string | null;
-  };
+  profiles?: VideoProfile;
 }
 
 const ContentManagement: React.FC = () => {
@@ -53,7 +55,9 @@ const ContentManagement: React.FC = () => {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setVideos(data || []);
+      
+      // Cast the data to the Video type
+      setVideos(data as Video[] || []);
     } catch (error) {
       console.error('Error fetching videos:', error);
       toast("Failed to load videos");

@@ -1,80 +1,83 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { 
-  RefreshCw, 
-  CheckCircle2, 
-  XCircle, 
-  Edit3, 
-  Trash2, 
-  UserX, 
-  ShieldAlert,
-  Video
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { format } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  LogIcon,
+  User,
+  Video,
+  Ban,
+  CheckCircle,
+  Edit,
+  Trash2,
+  RefreshCw,
+  Filter,
+  Eye,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Select, 
+  SelectContent, 
+  SelectGroup, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+
+interface ActionDetails {
+  [key: string]: any;
+}
 
 interface ModerationAction {
   id: string;
   admin_id: string;
   target_id: string;
-  target_type: 'user' | 'video';
-  action_type: 'suspend' | 'delete' | 'restore' | 'edit';
-  details: any;
+  target_type: "user" | "video";
+  action_type: string;
+  details: ActionDetails;
   created_at: string;
-  admin?: {
+  admin_profile?: {
     username: string;
     avatar_url: string | null;
   };
 }
 
 const ModerationLogs: React.FC = () => {
-  const [actions, setActions] = useState<ModerationAction[]>([]);
+  const [logs, setLogs] = useState<ModerationAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [admins, setAdmins] = useState<{[key: string]: {username: string, avatar_url: string | null}}>({}); 
+  const [filterType, setFilterType] = useState<"all" | "user" | "video">("all");
+  const [filterAction, setFilterAction] = useState<string>("all");
 
-  const fetchModerationActions = async () => {
+  const fetchLogs = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('moderation_actions')
-        .select()
+        .select(`
+          *,
+          admin_profile:admin_id (
+            username,
+            avatar_url
+          )
+        `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      // We need to fetch the admin usernames
-      const adminIds = [...new Set((data || []).map(action => action.admin_id))];
-      
-      if (adminIds.length > 0) {
-        const { data: adminData, error: adminError } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url')
-          .in('id', adminIds);
-          
-        if (adminError) throw adminError;
-        
-        const adminMap = (adminData || []).reduce((acc, admin) => {
-          acc[admin.id] = {
-            username: admin.username,
-            avatar_url: admin.avatar_url
-          };
-          return acc;
-        }, {} as {[key: string]: {username: string, avatar_url: string | null}});
-        
-        setAdmins(adminMap);
-      }
-      
-      // Type casting here to convert string to specific literal types
-      setActions((data || []).map(item => ({
-        ...item,
-        target_type: item.target_type === 'user' ? 'user' : 'video',
-        action_type: item.action_type as 'suspend' | 'delete' | 'restore' | 'edit'
-      })));
+      // Cast the data to the ModerationAction type
+      setLogs(data as ModerationAction[]);
     } catch (error) {
-      console.error('Error fetching moderation actions:', error);
+      console.error('Error fetching moderation logs:', error);
       toast("Failed to load moderation logs");
     } finally {
       setIsLoading(false);
@@ -82,7 +85,7 @@ const ModerationLogs: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchModerationActions();
+    fetchLogs();
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -153,7 +156,7 @@ const ModerationLogs: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Moderation Logs</h1>
-        <Button onClick={fetchModerationActions} variant="outline" size="sm">
+        <Button onClick={fetchLogs} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -176,8 +179,8 @@ const ModerationLogs: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {actions.length > 0 ? (
-                actions.map((action) => (
+              {logs.length > 0 ? (
+                logs.map((action) => (
                   <TableRow key={action.id}>
                     <TableCell>
                       <div className="flex items-center space-x-2">
@@ -188,12 +191,12 @@ const ModerationLogs: React.FC = () => {
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Avatar className="h-7 w-7">
-                          <AvatarImage src={admins[action.admin_id]?.avatar_url || undefined} />
+                          <AvatarImage src={action.admin_profile?.avatar_url || undefined} />
                           <AvatarFallback className="text-xs bg-purple-600 text-white">
-                            {(admins[action.admin_id]?.username || 'A').charAt(0).toUpperCase()}
+                            {(action.admin_profile?.username || 'A').charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span>{admins[action.admin_id]?.username || 'Unknown admin'}</span>
+                        <span>{action.admin_profile?.username || 'Unknown admin'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="max-w-md truncate">

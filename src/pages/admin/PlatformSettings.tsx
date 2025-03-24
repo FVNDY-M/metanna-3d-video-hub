@@ -10,15 +10,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RefreshCw, Save } from 'lucide-react';
 
+interface UploadLimits {
+  max_file_size_mb: number;
+  allowed_formats: string[];
+}
+
+interface ModerationSettings {
+  auto_flag_keywords: string[];
+  require_approval: boolean;
+}
+
 interface PlatformSettings {
-  upload_limits: {
-    max_file_size_mb: number;
-    allowed_formats: string[];
-  };
-  moderation_settings: {
-    auto_flag_keywords: string[];
-    require_approval: boolean;
-  };
+  upload_limits: UploadLimits;
+  moderation_settings: ModerationSettings;
 }
 
 const PlatformSettings: React.FC = () => {
@@ -50,14 +54,14 @@ const PlatformSettings: React.FC = () => {
       if (uploadLimits) {
         setSettings(prev => ({
           ...prev,
-          upload_limits: uploadLimits.setting_value
+          upload_limits: uploadLimits.setting_value as UploadLimits
         }));
       }
       
       if (moderationSettings) {
         setSettings(prev => ({
           ...prev,
-          moderation_settings: moderationSettings.setting_value
+          moderation_settings: moderationSettings.setting_value as ModerationSettings
         }));
       }
       
