@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, BarChart3, TrendingUp, Clock, Heart, MessageSquare } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import EmptyState from '@/components/EmptyState';
 
 interface VideoAnalyticsData {
@@ -39,7 +39,7 @@ interface VideoDetails {
 const VideoAnalytics = () => {
   const { videoId } = useParams<{ videoId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  
   const [loading, setLoading] = useState(true);
   const [analyticsData, setAnalyticsData] = useState<VideoAnalyticsData[]>([]);
   const [videoDetails, setVideoDetails] = useState<VideoDetails | null>(null);
@@ -48,11 +48,7 @@ const VideoAnalytics = () => {
   useEffect(() => {
     const fetchVideoDetails = async () => {
       if (!videoId) {
-        toast({
-          title: "Error",
-          description: "No video ID provided",
-          variant: "destructive"
-        });
+        toast("No video ID provided");
         navigate('/your-videos');
         return;
       }
@@ -62,11 +58,7 @@ const VideoAnalytics = () => {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          toast({
-            title: "Authentication required",
-            description: "Please log in to view video analytics",
-            variant: "destructive"
-          });
+          toast("Please log in to view video analytics");
           navigate('/login');
           return;
         }
@@ -80,11 +72,7 @@ const VideoAnalytics = () => {
           .single();
 
         if (videoError || !videoData) {
-          toast({
-            title: "Error",
-            description: "Unable to fetch video details or you don't have access to this video",
-            variant: "destructive"
-          });
+          toast("Unable to fetch video details or you don't have access to this video");
           navigate('/your-videos');
           return;
         }
@@ -108,31 +96,22 @@ const VideoAnalytics = () => {
 
         if (analyticsError) {
           console.error('Error fetching analytics data:', analyticsError);
-          toast({
-            title: "Error",
-            description: "Unable to fetch analytics data",
-            variant: "destructive"
-          });
+          toast("Unable to fetch analytics data");
           return;
         }
 
         setAnalyticsData(analyticsData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred",
-          variant: "destructive"
-        });
+        toast("An unexpected error occurred");
       } finally {
         setLoading(false);
       }
     };
 
     fetchVideoDetails();
-  }, [videoId, navigate, toast]);
+  }, [videoId, navigate]);
 
-  // Filter data based on time range
   const getFilteredData = () => {
     if (!analyticsData.length) return [];
     
@@ -151,22 +130,19 @@ const VideoAnalytics = () => {
 
   const filteredData = getFilteredData();
 
-  // Format data for charts
   const chartData = filteredData.map(item => ({
     period: format(parseISO(item.period_start), 'MMM dd'),
     views: item.views,
     likes: item.likes_count,
     comments: item.comments_count,
-    timeSpent: Math.round(item.time_spent / 60) // Convert seconds to minutes
-  })).reverse(); // Reverse to show chronological order
+    timeSpent: Math.round(item.time_spent / 60)
+  })).reverse();
 
-  // Calculate totals
   const totalViews = filteredData.reduce((sum, item) => sum + item.views, 0);
   const totalLikes = filteredData.reduce((sum, item) => sum + item.likes_count, 0);
   const totalComments = filteredData.reduce((sum, item) => sum + item.comments_count, 0);
   const totalTimeSpent = filteredData.reduce((sum, item) => sum + item.time_spent, 0);
-  
-  // Format time spent in hours and minutes
+
   const formatTimeSpent = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -204,9 +180,9 @@ const VideoAnalytics = () => {
       <PageLayout>
         <div className="max-w-6xl mx-auto px-4 py-8">
           <EmptyState 
+            icon={<BarChart3 className="h-12 w-12 text-gray-400" />}
             title="Video not found" 
             description="The requested video could not be found or you don't have permission to view its analytics."
-            icon={<BarChart3 className="h-12 w-12 text-gray-400" />}
           />
           <div className="flex justify-center mt-6">
             <Button onClick={() => navigate('/your-videos')}>
@@ -253,275 +229,190 @@ const VideoAnalytics = () => {
           </div>
         </div>
 
-        {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Views
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Eye className="h-4 w-4" /> Views
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalViews.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total views in selected period
-              </p>
             </CardContent>
           </Card>
+          
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Watch Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatTimeSpent(totalTimeSpent)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total time spent watching
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Heart className="h-4 w-4" />
-                Likes
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Heart className="h-4 w-4" /> Likes
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalLikes.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total likes in selected period
-              </p>
             </CardContent>
           </Card>
+          
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Comments
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" /> Comments
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalComments.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total comments in selected period
-              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Clock className="h-4 w-4" /> Watch Time
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatTimeSpent(totalTimeSpent)}</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Charts Section */}
-        <Tabs defaultValue="overview" className="mb-8">
+        <Tabs defaultValue="views" className="mb-8">
           <TabsList className="mb-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="views">Views</TabsTrigger>
             <TabsTrigger value="engagement">Engagement</TabsTrigger>
-            <TabsTrigger value="data">Raw Data</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="overview">
+          <TabsContent value="views" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Views Over Time</CardTitle>
                 <CardDescription>
-                  Tracking how your video is performing over time
+                  Daily view count for {timeRange === 'week' ? 'the last 7 days' : timeRange === 'month' ? 'the last 30 days' : 'all time'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {chartData.length > 0 ? (
-                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
-                    <ChartContainer
-                      config={{
-                        views: { label: 'Views', color: '#3b82f6' },
-                        timeSpent: { label: 'Watch Time (min)', color: '#10b981' }
-                      }}
-                    >
-                      <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
+                <div className="h-80">
+                  {chartData.length > 0 ? (
+                    <ChartContainer>
+                      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="period" 
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis 
-                          yAxisId="left" 
-                          orientation="left" 
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fontSize: 12 }}
-                          width={40}
-                        />
-                        <YAxis 
-                          yAxisId="right" 
-                          orientation="right" 
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fontSize: 12 }}
-                          width={40}
-                        />
+                        <XAxis dataKey="period" />
+                        <YAxis />
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <ChartLegend content={<ChartLegendContent />} />
-                        <Line 
-                          yAxisId="left"
-                          type="monotone" 
-                          dataKey="views" 
-                          stroke="#3b82f6" 
-                          strokeWidth={2} 
-                          dot={{ r: 3 }} 
-                          activeDot={{ r: 5 }} 
-                        />
-                        <Line 
-                          yAxisId="right"
-                          type="monotone" 
-                          dataKey="timeSpent" 
-                          stroke="#10b981" 
-                          strokeWidth={2} 
-                          dot={{ r: 3 }} 
-                          activeDot={{ r: 5 }} 
-                        />
+                        <Line type="monotone" dataKey="views" stroke="#8884d8" name="Views" />
                       </LineChart>
+                      <ChartLegend content={<ChartLegendContent />} />
                     </ChartContainer>
-                  </div>
-                ) : (
-                  <div className="flex justify-center items-center h-60">
-                    <p className="text-muted-foreground">No data available for the selected period</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No data available for the selected time period</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="engagement">
+            
             <Card>
               <CardHeader>
-                <CardTitle>Engagement Metrics</CardTitle>
+                <CardTitle>Watch Time</CardTitle>
                 <CardDescription>
-                  Comparing likes and comments over time
+                  Total minutes watched per day
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {chartData.length > 0 ? (
-                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
-                    <ChartContainer
-                      config={{
-                        likes: { label: 'Likes', color: '#ec4899' },
-                        comments: { label: 'Comments', color: '#8b5cf6' }
-                      }}
-                    >
-                      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
+                <div className="h-80">
+                  {chartData.length > 0 ? (
+                    <ChartContainer>
+                      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="period" 
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis 
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fontSize: 12 }}
-                          width={40}
-                        />
+                        <XAxis dataKey="period" />
+                        <YAxis />
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <ChartLegend content={<ChartLegendContent />} />
-                        <Bar 
-                          dataKey="likes" 
-                          fill="#ec4899" 
-                          radius={[4, 4, 0, 0]} 
-                          barSize={20}
-                        />
-                        <Bar 
-                          dataKey="comments" 
-                          fill="#8b5cf6" 
-                          radius={[4, 4, 0, 0]} 
-                          barSize={20}
-                        />
+                        <Bar dataKey="timeSpent" fill="#82ca9d" name="Minutes Watched" />
                       </BarChart>
+                      <ChartLegend content={<ChartLegendContent />} />
                     </ChartContainer>
-                  </div>
-                ) : (
-                  <div className="flex justify-center items-center h-60">
-                    <p className="text-muted-foreground">No data available for the selected period</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No data available for the selected time period</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
           
-          <TabsContent value="data">
+          <TabsContent value="engagement" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Raw Analytics Data</CardTitle>
+                <CardTitle>Likes & Comments</CardTitle>
                 <CardDescription>
-                  Weekly analytics breakdown
+                  Engagement metrics over time
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {filteredData.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Period</TableHead>
-                          <TableHead className="text-right">Views</TableHead>
-                          <TableHead className="text-right">Watch Time</TableHead>
-                          <TableHead className="text-right">Likes</TableHead>
-                          <TableHead className="text-right">Comments</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredData.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              {format(parseISO(item.period_start), 'MMM dd, yyyy')} - {format(parseISO(item.period_end), 'MMM dd, yyyy')}
-                            </TableCell>
-                            <TableCell className="text-right">{item.views.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{formatTimeSpent(item.time_spent)}</TableCell>
-                            <TableCell className="text-right">{item.likes_count.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{item.comments_count.toLocaleString()}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : (
-                  <div className="flex justify-center items-center py-8">
-                    <p className="text-muted-foreground">No data available for the selected period</p>
-                  </div>
-                )}
+                <div className="h-80">
+                  {chartData.length > 0 ? (
+                    <ChartContainer>
+                      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line type="monotone" dataKey="likes" stroke="#ff7300" name="Likes" />
+                        <Line type="monotone" dataKey="comments" stroke="#387908" name="Comments" />
+                      </LineChart>
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </ChartContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No data available for the selected time period</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Engagement Rate</CardTitle>
+                <CardDescription>
+                  Likes and comments per view
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Metric</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Per 100 Views</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Likes</TableCell>
+                      <TableCell>{totalLikes.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {totalViews > 0 
+                          ? ((totalLikes / totalViews) * 100).toFixed(2) 
+                          : '0.00'}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Comments</TableCell>
+                      <TableCell>{totalComments.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {totalViews > 0 
+                          ? ((totalComments / totalViews) * 100).toFixed(2) 
+                          : '0.00'}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Video Overall Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Overall Video Performance</CardTitle>
-            <CardDescription>
-              Lifetime metrics for this video
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-muted-foreground">Total Views</span>
-                <span className="text-2xl font-bold">{videoDetails.views.toLocaleString()}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-muted-foreground">Total Likes</span>
-                <span className="text-2xl font-bold">{videoDetails.likes_count.toLocaleString()}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-muted-foreground">Total Comments</span>
-                <span className="text-2xl font-bold">{videoDetails.comments_count.toLocaleString()}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </PageLayout>
   );
