@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Ban, Edit, Check, RefreshCw, Search, UserX, User } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -38,11 +38,7 @@ const UserManagement: React.FC = () => {
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load users",
-        variant: "destructive"
-      });
+      toast("Failed to load users");
     } finally {
       setIsLoading(false);
     }
@@ -73,10 +69,7 @@ const UserManagement: React.FC = () => {
         }
       });
       
-      toast({
-        title: user.is_suspended ? "User Restored" : "User Suspended",
-        description: `${user.username} has been ${user.is_suspended ? 'restored' : 'suspended'}.`
-      });
+      toast(user.is_suspended ? "User Restored" : "User Suspended");
       
       // Update the local state
       setUsers(users.map(u => 
@@ -84,11 +77,7 @@ const UserManagement: React.FC = () => {
       ));
     } catch (error) {
       console.error('Error suspending user:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update user status",
-        variant: "destructive"
-      });
+      toast("Failed to update user status");
     }
   };
 
@@ -101,10 +90,7 @@ const UserManagement: React.FC = () => {
       
       if (error) throw error;
       
-      toast({
-        title: "Role Updated",
-        description: `User role has been updated to ${newRole}`
-      });
+      toast(`User role has been updated to ${newRole}`);
       
       // Update the local state
       setUsers(users.map(u => 
@@ -114,11 +100,7 @@ const UserManagement: React.FC = () => {
       setUserDialogOpen(false);
     } catch (error) {
       console.error('Error updating role:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update user role",
-        variant: "destructive"
-      });
+      toast("Failed to update user role");
     }
   };
 

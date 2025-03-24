@@ -9,7 +9,8 @@ import {
   Edit3, 
   Trash2, 
   UserX, 
-  ShieldAlert
+  ShieldAlert,
+  Video
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -66,14 +67,15 @@ const ModerationLogs: React.FC = () => {
         setAdmins(adminMap);
       }
       
-      setActions(data || []);
+      // Type casting here to convert string to specific literal types
+      setActions((data || []).map(item => ({
+        ...item,
+        target_type: item.target_type === 'user' ? 'user' : 'video',
+        action_type: item.action_type as 'suspend' | 'delete' | 'restore' | 'edit'
+      })));
     } catch (error) {
       console.error('Error fetching moderation actions:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load moderation logs",
-        variant: "destructive"
-      });
+      toast("Failed to load moderation logs");
     } finally {
       setIsLoading(false);
     }

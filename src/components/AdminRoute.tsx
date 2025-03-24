@@ -78,11 +78,7 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   }
 
   if (!isAdmin) {
-    toast({
-      title: "Access Denied",
-      description: "You don't have permission to access the admin area",
-      variant: "destructive"
-    });
+    toast("Access Denied: You don't have permission to access the admin area");
     return <Navigate to="/" replace />;
   }
 

@@ -3,10 +3,12 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Save, Trash2, Plus } from 'lucide-react';
+import { RefreshCw, Save } from 'lucide-react';
 
 interface PlatformSettings {
   upload_limits: {
@@ -23,311 +25,251 @@ const PlatformSettings: React.FC = () => {
   const [settings, setSettings] = useState<PlatformSettings>({
     upload_limits: {
       max_file_size_mb: 500,
-      allowed_formats: ['mp4', 'mov', 'webm'],
+      allowed_formats: ['mp4', 'mov', 'webm']
     },
     moderation_settings: {
       auto_flag_keywords: ['offensive', 'explicit'],
-      require_approval: false,
-    },
+      require_approval: false
+    }
   });
-  
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [newFormat, setNewFormat] = useState('');
-  const [newKeyword, setNewKeyword] = useState('');
-
+  
   const fetchSettings = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('platform_settings')
-        .select('setting_key, setting_value');
+        .select('*');
       
       if (error) throw error;
       
-      const settingsMap = (data || []).reduce((acc, item) => {
-        acc[item.setting_key] = item.setting_value;
-        return acc;
-      }, {} as Record<string, any>);
+      const uploadLimits = data.find(setting => setting.setting_key === 'upload_limits');
+      const moderationSettings = data.find(setting => setting.setting_key === 'moderation_settings');
       
-      setSettings({
-        upload_limits: settingsMap.upload_limits || settings.upload_limits,
-        moderation_settings: settingsMap.moderation_settings || settings.moderation_settings,
-      });
+      if (uploadLimits) {
+        setSettings(prev => ({
+          ...prev,
+          upload_limits: uploadLimits.setting_value
+        }));
+      }
+      
+      if (moderationSettings) {
+        setSettings(prev => ({
+          ...prev,
+          moderation_settings: moderationSettings.setting_value
+        }));
+      }
+      
     } catch (error) {
       console.error('Error fetching settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load platform settings",
-        variant: "destructive"
-      });
+      toast("Failed to load platform settings");
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   useEffect(() => {
     fetchSettings();
   }, []);
-
-  const handleSaveSettings = async () => {
+  
+  const saveSettings = async (settingKey: 'upload_limits' | 'moderation_settings') => {
     setIsSaving(true);
     try {
-      // Update upload limits
-      const { error: uploadError } = await supabase
+      const { error } = await supabase
         .from('platform_settings')
-        .upsert({
-          setting_key: 'upload_limits',
-          setting_value: settings.upload_limits,
+        .update({ 
+          setting_value: settings[settingKey],
           updated_by: (await supabase.auth.getSession()).data.session?.user.id,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'setting_key' });
+        })
+        .eq('setting_key', settingKey);
+        
+      if (error) throw error;
       
-      if (uploadError) throw uploadError;
-      
-      // Update moderation settings
-      const { error: moderationError } = await supabase
-        .from('platform_settings')
-        .upsert({
-          setting_key: 'moderation_settings',
-          setting_value: settings.moderation_settings,
-          updated_by: (await supabase.auth.getSession()).data.session?.user.id,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'setting_key' });
-      
-      if (moderationError) throw moderationError;
-      
-      toast({
-        title: "Settings Saved",
-        description: "Platform settings have been updated successfully."
-      });
+      toast("Settings saved successfully");
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save platform settings",
-        variant: "destructive"
-      });
+      toast("Failed to save settings");
     } finally {
       setIsSaving(false);
     }
   };
-
-  const handleAddFormat = () => {
-    if (!newFormat.trim()) return;
-    
-    const formats = [...settings.upload_limits.allowed_formats];
-    if (!formats.includes(newFormat.toLowerCase().trim())) {
-      formats.push(newFormat.toLowerCase().trim());
-      setSettings({
-        ...settings,
+  
+  const handleMaxFileSizeChange = (value: string) => {
+    const size = parseInt(value);
+    if (!isNaN(size)) {
+      setSettings(prev => ({
+        ...prev,
         upload_limits: {
-          ...settings.upload_limits,
-          allowed_formats: formats
+          ...prev.upload_limits,
+          max_file_size_mb: size
         }
-      });
+      }));
     }
-    
-    setNewFormat('');
   };
-
-  const handleRemoveFormat = (format: string) => {
-    const formats = settings.upload_limits.allowed_formats.filter(f => f !== format);
-    setSettings({
-      ...settings,
+  
+  const handleAllowedFormatsChange = (value: string) => {
+    const formats = value.split(',').map(format => format.trim().toLowerCase());
+    setSettings(prev => ({
+      ...prev,
       upload_limits: {
-        ...settings.upload_limits,
+        ...prev.upload_limits,
         allowed_formats: formats
       }
-    });
+    }));
   };
-
-  const handleAddKeyword = () => {
-    if (!newKeyword.trim()) return;
-    
-    const keywords = [...settings.moderation_settings.auto_flag_keywords];
-    if (!keywords.includes(newKeyword.toLowerCase().trim())) {
-      keywords.push(newKeyword.toLowerCase().trim());
-      setSettings({
-        ...settings,
-        moderation_settings: {
-          ...settings.moderation_settings,
-          auto_flag_keywords: keywords
-        }
-      });
-    }
-    
-    setNewKeyword('');
-  };
-
-  const handleRemoveKeyword = (keyword: string) => {
-    const keywords = settings.moderation_settings.auto_flag_keywords.filter(k => k !== keyword);
-    setSettings({
-      ...settings,
+  
+  const handleAutoFlagKeywordsChange = (value: string) => {
+    const keywords = value.split(',').map(keyword => keyword.trim().toLowerCase());
+    setSettings(prev => ({
+      ...prev,
       moderation_settings: {
-        ...settings.moderation_settings,
+        ...prev.moderation_settings,
         auto_flag_keywords: keywords
       }
-    });
+    }));
   };
-
+  
+  const handleRequireApprovalChange = (checked: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      moderation_settings: {
+        ...prev.moderation_settings,
+        require_approval: checked
+      }
+    }));
+  };
+  
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+      <div className="flex items-center justify-center h-60">
         <div className="w-10 h-10 border-4 border-t-metanna-blue border-b-metanna-blue border-r-transparent border-l-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
-
+  
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Platform Settings</h1>
-        <Button onClick={handleSaveSettings} disabled={isSaving}>
-          {isSaving ? (
-            <div className="h-5 w-5 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          Save Changes
+        <Button onClick={fetchSettings} variant="outline" size="sm">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Upload Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload Settings</CardTitle>
-            <CardDescription>
-              Configure the upload limits and allowed file formats
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="maxFileSize" className="text-sm font-medium">
-                Maximum File Size (MB)
-              </label>
-              <Input
-                id="maxFileSize"
-                type="number"
-                value={settings.upload_limits.max_file_size_mb}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  upload_limits: {
-                    ...settings.upload_limits,
-                    max_file_size_mb: parseInt(e.target.value) || 0
-                  }
-                })}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Allowed File Formats
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {settings.upload_limits.allowed_formats.map((format) => (
-                  <div 
-                    key={format} 
-                    className="flex items-center bg-metanna-blue/10 text-metanna-blue rounded-lg px-3 py-1"
-                  >
-                    <span>{format}</span>
-                    <button 
-                      className="ml-2 text-red-500 hover:text-red-700"
-                      onClick={() => handleRemoveFormat(format)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex mt-2">
-                <Input
-                  placeholder="Add new format (e.g., mp4)"
-                  value={newFormat}
-                  onChange={(e) => setNewFormat(e.target.value)}
-                  className="rounded-r-none"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddFormat()}
-                />
-                <Button 
-                  onClick={handleAddFormat}
-                  className="rounded-l-none"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="upload_limits" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="upload_limits">Upload Limits</TabsTrigger>
+          <TabsTrigger value="moderation">Moderation</TabsTrigger>
+        </TabsList>
         
-        {/* Moderation Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Moderation Settings</CardTitle>
-            <CardDescription>
-              Configure automatic content moderation rules
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2 mb-6">
-              <Checkbox 
-                id="requireApproval" 
-                checked={settings.moderation_settings.require_approval}
-                onCheckedChange={(checked) => setSettings({
-                  ...settings,
-                  moderation_settings: {
-                    ...settings.moderation_settings,
-                    require_approval: checked === true
-                  }
-                })}
-              />
-              <label 
-                htmlFor="requireApproval" 
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Require admin approval for new uploads
-              </label>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Auto-flag Keywords
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {settings.moderation_settings.auto_flag_keywords.map((keyword) => (
-                  <div 
-                    key={keyword} 
-                    className="flex items-center bg-red-100 text-red-800 rounded-lg px-3 py-1"
-                  >
-                    <span>{keyword}</span>
-                    <button 
-                      className="ml-2 text-red-500 hover:text-red-700"
-                      onClick={() => handleRemoveKeyword(keyword)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex mt-2">
+        <TabsContent value="upload_limits">
+          <Card>
+            <CardHeader>
+              <CardTitle>Upload Limits</CardTitle>
+              <CardDescription>
+                Configure file size limits and allowed formats for video uploads.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="max_file_size">Maximum File Size (MB)</Label>
                 <Input
-                  placeholder="Add flagged keyword"
-                  value={newKeyword}
-                  onChange={(e) => setNewKeyword(e.target.value)}
-                  className="rounded-r-none"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddKeyword()}
+                  id="max_file_size"
+                  type="number"
+                  value={settings.upload_limits.max_file_size_mb}
+                  onChange={(e) => handleMaxFileSizeChange(e.target.value)}
                 />
-                <Button 
-                  onClick={handleAddKeyword}
-                  className="rounded-l-none"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="allowed_formats">Allowed File Formats</Label>
+                <Input
+                  id="allowed_formats"
+                  placeholder="mp4, mov, webm"
+                  value={settings.upload_limits.allowed_formats.join(', ')}
+                  onChange={(e) => handleAllowedFormatsChange(e.target.value)}
+                />
+                <p className="text-sm text-gray-500">Enter formats separated by commas.</p>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                className="ml-auto" 
+                onClick={() => saveSettings('upload_limits')}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="moderation">
+          <Card>
+            <CardHeader>
+              <CardTitle>Moderation Settings</CardTitle>
+              <CardDescription>
+                Configure automatic moderation rules and approval workflows.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="flag_keywords">Auto-Flag Keywords</Label>
+                <Input
+                  id="flag_keywords"
+                  placeholder="offensive, explicit"
+                  value={settings.moderation_settings.auto_flag_keywords.join(', ')}
+                  onChange={(e) => handleAutoFlagKeywordsChange(e.target.value)}
+                />
+                <p className="text-sm text-gray-500">Enter keywords separated by commas. Videos containing these words will be automatically flagged for review.</p>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="require_approval"
+                  checked={settings.moderation_settings.require_approval}
+                  onCheckedChange={handleRequireApprovalChange}
+                />
+                <Label htmlFor="require_approval">
+                  Require manual approval for all new uploads
+                </Label>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                className="ml-auto" 
+                onClick={() => saveSettings('moderation_settings')}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

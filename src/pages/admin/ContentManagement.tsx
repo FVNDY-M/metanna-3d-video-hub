@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
-  Ban, Edit, Check, Trash2, RefreshCw, Search, ExternalLink, Eye
+  Ban, Edit, Check, Trash2, RefreshCw, Search, ExternalLink, Eye, Video
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -56,11 +56,7 @@ const ContentManagement: React.FC = () => {
       setVideos(data || []);
     } catch (error) {
       console.error('Error fetching videos:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load videos",
-        variant: "destructive"
-      });
+      toast("Failed to load videos");
     } finally {
       setIsLoading(false);
     }
@@ -91,10 +87,7 @@ const ContentManagement: React.FC = () => {
         }
       });
 
-      toast({
-        title: video.is_suspended ? "Video Restored" : "Video Suspended",
-        description: `"${video.title}" has been ${video.is_suspended ? 'restored' : 'suspended'}.`
-      });
+      toast(video.is_suspended ? "Video Restored" : "Video Suspended");
       
       // Update the local state
       setVideos(videos.map(v => 
@@ -102,11 +95,7 @@ const ContentManagement: React.FC = () => {
       ));
     } catch (error) {
       console.error('Error suspending video:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update video status",
-        variant: "destructive"
-      });
+      toast("Failed to update video status");
     }
   };
 
@@ -123,20 +112,13 @@ const ContentManagement: React.FC = () => {
       
       if (error) throw error;
       
-      toast({
-        title: "Video Deleted",
-        description: "The video has been permanently deleted."
-      });
+      toast("Video Deleted");
       
       // Update the local state
       setVideos(videos.filter(v => v.id !== videoId));
     } catch (error) {
       console.error('Error deleting video:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete video",
-        variant: "destructive"
-      });
+      toast("Failed to delete video");
     }
   };
 
@@ -173,10 +155,7 @@ const ContentManagement: React.FC = () => {
         }
       });
 
-      toast({
-        title: "Video Updated",
-        description: "The video details have been updated."
-      });
+      toast("Video Updated");
       
       // Update the local state
       setVideos(videos.map(v => 
@@ -190,11 +169,7 @@ const ContentManagement: React.FC = () => {
       setVideoDialogOpen(false);
     } catch (error) {
       console.error('Error updating video:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update video details",
-        variant: "destructive"
-      });
+      toast("Failed to update video details");
     }
   };
 

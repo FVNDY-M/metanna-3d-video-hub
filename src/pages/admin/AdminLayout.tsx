@@ -22,18 +22,11 @@ const AdminLayout: React.FC = () => {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out"
-      });
+      toast("Logged out successfully");
       navigate('/login');
     } catch (error) {
       console.error('Error logging out:', error);
-      toast({
-        title: "Error",
-        description: "There was a problem logging out",
-        variant: "destructive"
-      });
+      toast("There was a problem logging out");
     }
   };
 
