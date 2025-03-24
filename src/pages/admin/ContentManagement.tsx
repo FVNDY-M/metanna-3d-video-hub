@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
@@ -20,20 +19,23 @@ interface VideoProfile {
 interface Video {
   id: string;
   title: string;
-  description: string | null;
+  description: string;
   thumbnail_url: string | null;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
   views: number;
   likes_count: number;
   comments_count: number;
-  user_id: string;
-  created_at: string;
+  category: string;
   is_suspended: boolean;
-  profiles?: VideoProfile;
+  duration: number;
+  profiles: VideoProfile;
 }
 
 const ContentManagement: React.FC = () => {
   const [videos, setVideos] = useState<Video[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
@@ -41,28 +43,27 @@ const ContentManagement: React.FC = () => {
   const [editedDescription, setEditedDescription] = useState('');
 
   const fetchVideos = async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('videos')
         .select(`
           *,
-          profiles:user_id (
-            username,
-            avatar_url
-          )
+          profiles(username, avatar_url)
         `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      // Cast the data to the Video type
-      setVideos(data as Video[] || []);
+      setVideos(data as unknown as Video[]);
     } catch (error) {
       console.error('Error fetching videos:', error);
-      toast("Failed to load videos");
+      toast({
+        title: "Error",
+        description: "Failed to load videos"
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -79,7 +80,6 @@ const ContentManagement: React.FC = () => {
       
       if (error) throw error;
       
-      // Log moderation action
       await supabase.from('moderation_actions').insert({
         admin_id: (await supabase.auth.getSession()).data.session?.user.id,
         target_id: video.id,
@@ -93,7 +93,6 @@ const ContentManagement: React.FC = () => {
 
       toast(video.is_suspended ? "Video Restored" : "Video Suspended");
       
-      // Update the local state
       setVideos(videos.map(v => 
         v.id === video.id ? { ...v, is_suspended: !v.is_suspended } : v
       ));
@@ -118,7 +117,6 @@ const ContentManagement: React.FC = () => {
       
       toast("Video Deleted");
       
-      // Update the local state
       setVideos(videos.filter(v => v.id !== videoId));
     } catch (error) {
       console.error('Error deleting video:', error);
@@ -147,7 +145,6 @@ const ContentManagement: React.FC = () => {
       
       if (error) throw error;
       
-      // Log moderation action
       await supabase.from('moderation_actions').insert({
         admin_id: (await supabase.auth.getSession()).data.session?.user.id,
         target_id: selectedVideo.id,
@@ -161,7 +158,6 @@ const ContentManagement: React.FC = () => {
 
       toast("Video Updated");
       
-      // Update the local state
       setVideos(videos.map(v => 
         v.id === selectedVideo.id ? { 
           ...v, 

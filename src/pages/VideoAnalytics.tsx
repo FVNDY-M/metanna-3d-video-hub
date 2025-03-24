@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format, parseISO, subDays } from 'date-fns';
@@ -11,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, BarChart3, TrendingUp, Clock, Heart, MessageSquare } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import EmptyState from '@/components/EmptyState';
 
 interface VideoAnalyticsData {
@@ -39,7 +38,8 @@ interface VideoDetails {
 const VideoAnalytics = () => {
   const { videoId } = useParams<{ videoId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  
+  // Replace useToast with direct toast import
   const [loading, setLoading] = useState(true);
   const [analyticsData, setAnalyticsData] = useState<VideoAnalyticsData[]>([]);
   const [videoDetails, setVideoDetails] = useState<VideoDetails | null>(null);
@@ -51,7 +51,6 @@ const VideoAnalytics = () => {
         toast({
           title: "Error",
           description: "No video ID provided",
-          variant: "destructive"
         });
         navigate('/your-videos');
         return;
@@ -65,7 +64,6 @@ const VideoAnalytics = () => {
           toast({
             title: "Authentication required",
             description: "Please log in to view video analytics",
-            variant: "destructive"
           });
           navigate('/login');
           return;
@@ -83,7 +81,6 @@ const VideoAnalytics = () => {
           toast({
             title: "Error",
             description: "Unable to fetch video details or you don't have access to this video",
-            variant: "destructive"
           });
           navigate('/your-videos');
           return;
@@ -111,7 +108,6 @@ const VideoAnalytics = () => {
           toast({
             title: "Error",
             description: "Unable to fetch analytics data",
-            variant: "destructive"
           });
           return;
         }
@@ -122,7 +118,6 @@ const VideoAnalytics = () => {
         toast({
           title: "Error",
           description: "An unexpected error occurred",
-          variant: "destructive"
         });
       } finally {
         setLoading(false);
@@ -130,7 +125,7 @@ const VideoAnalytics = () => {
     };
 
     fetchVideoDetails();
-  }, [videoId, navigate, toast]);
+  }, [videoId, navigate]);
 
   // Filter data based on time range
   const getFilteredData = () => {

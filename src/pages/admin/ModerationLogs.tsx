@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  LogIcon,
+  FileText,
   User,
   Video,
   Ban,
@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Filter,
   Eye,
+  AlertTriangle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -74,8 +75,7 @@ const ModerationLogs: React.FC = () => {
       
       if (error) throw error;
       
-      // Cast the data to the ModerationAction type
-      setLogs(data as ModerationAction[]);
+      setLogs(data as unknown as ModerationAction[]);
     } catch (error) {
       console.error('Error fetching moderation logs:', error);
       toast("Failed to load moderation logs");
@@ -101,15 +101,15 @@ const ModerationLogs: React.FC = () => {
   const getActionIcon = (actionType: string) => {
     switch (actionType) {
       case 'suspend':
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <Ban className="h-5 w-5 text-red-500" />;
       case 'restore':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
       case 'edit':
-        return <Edit3 className="h-5 w-5 text-blue-500" />;
+        return <Edit className="h-5 w-5 text-blue-500" />;
       case 'delete':
         return <Trash2 className="h-5 w-5 text-red-500" />;
       default:
-        return <ShieldAlert className="h-5 w-5 text-yellow-500" />;
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
     }
   };
 
@@ -206,7 +206,7 @@ const ModerationLogs: React.FC = () => {
                       <div className="flex items-center">
                         {action.target_type === 'user' ? (
                           <>
-                            <UserX className="h-4 w-4 mr-1 text-indigo-500" />
+                            <User className="h-4 w-4 mr-1 text-indigo-500" />
                             <span>User</span>
                           </>
                         ) : (

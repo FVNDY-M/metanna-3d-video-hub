@@ -8,7 +8,7 @@ import VideoCard from '@/components/VideoCard';
 import EmptyState from '@/components/EmptyState';
 import { User, Video, Heart, Pencil, BarChart3, Clock, MessageSquare, TrendingUp, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import VideoAnalyticsPreview from '@/components/VideoAnalyticsPreview';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
@@ -723,4 +723,3 @@ const Profile = () => {
 };
 
 export default Profile;
-
