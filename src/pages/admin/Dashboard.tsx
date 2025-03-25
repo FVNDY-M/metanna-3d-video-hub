@@ -1,11 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Film, Users, Heart, MessageSquare, Eye } from 'lucide-react';
+import { Film, Users, Heart, MessageSquare, Eye, BarChart3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import AdminLayout from '@/components/AdminLayout';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line, Tooltip, Legend } from 'recharts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Define interfaces for our data
 interface AdminProfile {
@@ -24,17 +27,33 @@ interface ModerationAction {
   admin?: AdminProfile;
 }
 
+interface UserStats {
+  totalUsers: number;
+  activeUsers: number;
+  normalUsers: number;
+}
+
+interface TimeSeriesData {
+  name: string;
+  totalUsers: number;
+  activeUsers?: number;
+  normalUsers?: number;
+}
+
 interface DashboardStats {
   totalVideos: number;
-  totalUsers: number;
+  userStats: UserStats;
   totalLikes: number;
   totalComments: number;
   totalViews: number;
   totalInteractions: number;
   recentActions: ModerationAction[];
+  timeSeriesData: TimeSeriesData[];
 }
 
 const AdminDashboard = () => {
+  const [selectedUserTab, setSelectedUserTab] = useState<string>('all');
+
   const { data: statsData, isLoading: isStatsLoading } = useQuery({
     queryKey: ['admin-dashboard-stats'],
     queryFn: async () => {
@@ -44,7 +63,8 @@ const AdminDashboard = () => {
         { count: totalUsers, error: usersError },
         { count: totalLikes, error: likesError },
         { count: totalComments, error: commentsError },
-        { data: recentActions, error: actionsError }
+        { data: recentActions, error: actionsError },
+        { data: contentCreators, error: creatorError }
       ] = await Promise.all([
         supabase.from('videos').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -54,14 +74,22 @@ const AdminDashboard = () => {
           .from('moderation_actions')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(5),
+        supabase
+          .from('profiles')
+          .select('id')
+          .in('id', supabase.from('videos').select('user_id').eq('visibility', 'public'))
       ]);
 
-      if (videosError || usersError || likesError || commentsError || actionsError) {
-        console.error("Error fetching stats:", videosError || usersError || likesError || commentsError || actionsError);
+      if (videosError || usersError || likesError || commentsError || actionsError || creatorError) {
+        console.error("Error fetching stats:", videosError || usersError || likesError || commentsError || actionsError || creatorError);
         throw new Error("Failed to fetch dashboard statistics");
       }
 
+      // Calculate active vs normal users
+      const activeUsers = contentCreators?.length || 0;
+      const normalUsers = totalUsers - activeUsers;
+      
       // Get views count by summing all video views
       const { data: videosData, error: viewsError } = await supabase
         .from('videos')
@@ -71,6 +99,17 @@ const AdminDashboard = () => {
         console.error("Error fetching views:", viewsError);
         throw new Error("Failed to fetch views statistics");
       }
+
+      // Generate time series data (simulated for now)
+      // In a real app, this would be querying historical data from the database
+      const timeSeriesData: TimeSeriesData[] = [
+        { name: 'Jan', totalUsers: totalUsers - 50, activeUsers: activeUsers - 10, normalUsers: normalUsers - 40 },
+        { name: 'Feb', totalUsers: totalUsers - 40, activeUsers: activeUsers - 8, normalUsers: normalUsers - 32 },
+        { name: 'Mar', totalUsers: totalUsers - 30, activeUsers: activeUsers - 6, normalUsers: normalUsers - 24 },
+        { name: 'Apr', totalUsers: totalUsers - 20, activeUsers: activeUsers - 4, normalUsers: normalUsers - 16 },
+        { name: 'May', totalUsers: totalUsers - 10, activeUsers: activeUsers - 2, normalUsers: normalUsers - 8 },
+        { name: 'Jun', totalUsers: totalUsers, activeUsers: activeUsers, normalUsers: normalUsers }
+      ];
 
       // If we have admin actions, fetch the admin usernames separately
       let actionsWithAdmins: ModerationAction[] = [];
@@ -103,12 +142,17 @@ const AdminDashboard = () => {
       
       return {
         totalVideos: totalVideos,
-        totalUsers: totalUsers,
+        userStats: {
+          totalUsers: totalUsers,
+          activeUsers: activeUsers,
+          normalUsers: normalUsers
+        },
         totalLikes: totalLikes,
         totalComments: totalComments,
         totalViews: totalViews,
         totalInteractions: totalLikes + totalComments + totalViews,
-        recentActions: actionsWithAdmins
+        recentActions: actionsWithAdmins,
+        timeSeriesData: timeSeriesData
       } as DashboardStats;
     },
     refetchInterval: 60000, // Refetch every minute
@@ -132,6 +176,32 @@ const AdminDashboard = () => {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
+  };
+
+  // Get the appropriate time series data based on the selected tab
+  const getChartData = () => {
+    if (!statsData?.timeSeriesData) return [];
+    
+    switch (selectedUserTab) {
+      case 'active':
+        return statsData.timeSeriesData.map(item => ({
+          name: item.name,
+          users: item.activeUsers || 0
+        }));
+      case 'normal':
+        return statsData.timeSeriesData.map(item => ({
+          name: item.name,
+          users: item.normalUsers || 0
+        }));
+      case 'all':
+      default:
+        return statsData.timeSeriesData.map(item => ({
+          name: item.name,
+          active: item.activeUsers || 0,
+          normal: item.normalUsers || 0,
+          total: item.totalUsers
+        }));
+    }
   };
 
   return (
@@ -158,12 +228,18 @@ const AdminDashboard = () => {
             
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Active Users</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-500">Users</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center">
-                  <Users className="h-5 w-5 text-metanna-purple mr-2" />
-                  <span className="text-2xl font-bold">{statsData?.totalUsers.toLocaleString()}</span>
+                <div className="flex flex-col">
+                  <div className="flex items-center mb-1">
+                    <Users className="h-5 w-5 text-metanna-purple mr-2" />
+                    <span className="text-2xl font-bold">{statsData?.userStats.totalUsers.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                    <span>Active: {statsData?.userStats.activeUsers.toLocaleString()}</span>
+                    <span>Normal: {statsData?.userStats.normalUsers.toLocaleString()}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -192,6 +268,65 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* User Stats Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2" />
+                User Statistics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={selectedUserTab} onValueChange={setSelectedUserTab} className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="all">All Users</TabsTrigger>
+                  <TabsTrigger value="active">Active Users</TabsTrigger>
+                  <TabsTrigger value="normal">Normal Users</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="all" className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={getChartData()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="active" name="Active Users" fill="#8884d8" />
+                      <Bar dataKey="normal" name="Normal Users" fill="#82ca9d" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+                
+                <TabsContent value="active" className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={getChartData()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="users" name="Active Users" stroke="#8884d8" activeDot={{ r: 8 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+                
+                <TabsContent value="normal" className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={getChartData()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="users" name="Normal Users" stroke="#82ca9d" activeDot={{ r: 8 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
 
           {/* Recent Moderation Actions */}
           <Card>
