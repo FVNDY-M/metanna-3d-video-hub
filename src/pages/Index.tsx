@@ -348,7 +348,7 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           </TabsHeader>
           
           <TabsContent value="home">
-            {currentUser ? (
+            {/* {currentUser ? (
               subscriptionsLoading ? (
                 <div className="flex justify-center items-center py-20">
                   <div className="loader"></div>
@@ -387,6 +387,34 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
                 description="Log in to see videos from channels you subscribe to." 
                 icon="🔒" 
               />
+            )} */}
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="loader"></div>
+              </div>
+            ) : videos.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                  {videos.map((video) => (
+                    <VideoCard key={video.id} video={video} />
+                  ))}
+                </div>
+                
+                {hasMore && (
+                  <div className="flex justify-center mt-8">
+                    <Button 
+                      onClick={loadMoreVideos} 
+                      disabled={loadingMore}
+                      className="gap-2"
+                    >
+                      {loadingMore && <Loader className="h-4 w-4 animate-spin" />}
+                      Load More Videos
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <EmptyState />
             )}
           </TabsContent>
           
