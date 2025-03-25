@@ -62,6 +62,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -74,6 +75,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thumbnailCanvasRef = useRef<HTMLCanvasElement>(null);
+  const thumbnailDropAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchVideoDetails = async () => {
@@ -157,6 +159,10 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     
+    processImageFile(file);
+  };
+  
+  const processImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file for the thumbnail');
       return;
@@ -175,6 +181,29 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
       }
     };
     reader.readAsDataURL(file);
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      processImageFile(file);
+    }
   };
   
   const cropAndSetThumbnail = (img: HTMLImageElement) => {
@@ -247,6 +276,10 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     } finally {
       setUploadingThumbnail(false);
     }
+  };
+
+  const isFormValid = (): boolean => {
+    return !!title.trim();
   };
 
   const handleSave = async () => {
@@ -385,8 +418,14 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
               <div className="col-span-4">
                 <Label className="block mb-2">Thumbnail</Label>
                 <div 
-                  className="relative cursor-pointer group"
+                  ref={thumbnailDropAreaRef}
+                  className={`relative cursor-pointer group rounded-md overflow-hidden ${
+                    isDraggingOver ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                  }`}
                   onClick={handleThumbnailClick}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 >
                   <div className="aspect-video bg-black rounded-md overflow-hidden">
                     {thumbnailPreview ? (
@@ -409,6 +448,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
                     <div className="text-white text-center">
                       <CropIcon className="h-5 w-5 mx-auto mb-1" />
                       <p className="text-xs">Images will be cropped to 16:9</p>
+                      <p className="text-xs mt-1">Drop image here or click to upload</p>
                     </div>
                   </div>
                   
@@ -421,7 +461,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Click to upload a new thumbnail
+                  Click or drag and drop to upload a new thumbnail
                 </p>
               </div>
             </div>
@@ -465,7 +505,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
                   </Button>
                   <Button 
                     onClick={handleSave} 
-                    disabled={saving || uploadingThumbnail || !title.trim()}
+                    disabled={saving || uploadingThumbnail || !isFormValid()}
                   >
                     {saving || uploadingThumbnail ? 'Saving...' : 'Save Changes'}
                   </Button>

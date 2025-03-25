@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -34,11 +35,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoLink, setVideoLink] = useState<string | null>(null);
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'processing' | 'complete'>('idle');
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const navigate = useNavigate();
   
   // Thumbnail cropping refs and state
   const thumbnailCanvasRef = useRef<HTMLCanvasElement>(null);
   const [thumbnailCropped, setThumbnailCropped] = useState<Blob | null>(null);
+  const thumbnailDropAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -58,6 +61,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    processImageFile(file);
+  };
+  
+  const processImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       setError('Please upload an image file for the thumbnail');
       toast.error('Invalid file type for thumbnail');
@@ -78,6 +85,29 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
       }
     };
     reader.readAsDataURL(file);
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      processImageFile(file);
+    }
   };
   
   const cropAndSetThumbnail = (img: HTMLImageElement) => {
@@ -194,6 +224,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     return true;
   };
 
+  const areRequiredFieldsFilled = (): boolean => {
+    return !!(title.trim() && thumbnail && video);
+  };
+
   const uploadToStorage = async (file: File | Blob, bucket: string, path: string, filename: string) => {
     try {
       // Fix: Use only alphanumeric characters, underscores, and dashes in file paths
@@ -303,6 +337,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
     setError('');
     setUploadProgress(0);
     setUploadPhase('idle');
+    setIsDraggingOver(false);
   };
 
   const handleClose = () => {
@@ -359,8 +394,12 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
                   <div className="space-y-2">
                     <Label className="text-gray-600">Thumbnail</Label>
                     <div 
-                      className="border border-gray-300 rounded-md bg-white overflow-hidden cursor-pointer relative"
+                      ref={thumbnailDropAreaRef}
+                      className={`border border-gray-300 rounded-md bg-white overflow-hidden cursor-pointer relative ${isDraggingOver ? 'bg-blue-50 border-blue-400 border-dashed' : ''}`}
                       onClick={() => document.getElementById('thumbnail-upload')?.click()}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                     >
                       {/* Fixed aspect ratio container */}
                       <div className="aspect-video relative">
@@ -374,6 +413,9 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
                           <div className="flex flex-col items-center justify-center text-gray-400 h-full">
                             <ImageIcon className="h-12 w-12 mb-2" />
                             <span className="text-sm">Upload thumbnail (16:9 ratio)</span>
+                            {isDraggingOver && (
+                              <span className="mt-2 text-blue-500 text-sm font-medium">Drop image here</span>
+                            )}
                           </div>
                         )}
                         
@@ -382,6 +424,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
                           <div className="text-white text-center p-4">
                             <CropIcon className="h-8 w-8 mx-auto mb-2" />
                             <p className="text-sm">Images will be cropped to 16:9 ratio</p>
+                            <p className="text-xs mt-2">Drag and drop or click to upload</p>
                           </div>
                         </div>
                       </div>
@@ -489,7 +532,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, user }) => {
               <Button
                 type="submit"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                disabled={loading}
+                disabled={loading || !areRequiredFieldsFilled()}
               >
                 {loading ? (
                   <span className="flex items-center justify-center">
