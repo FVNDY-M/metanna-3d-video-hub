@@ -135,7 +135,7 @@ export const deleteVideo = async (videoId: string): Promise<{ success: boolean; 
       return { success: false, error: commentsError };
     }
     
-    // 4. Delete video analytics
+    // 4. Delete video analytics - This is the key change to fix the foreign key constraint
     const { error: analyticsError } = await supabase
       .from('video_analytics')
       .delete()
