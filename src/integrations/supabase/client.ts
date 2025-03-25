@@ -92,3 +92,74 @@ export const toggleCommentPinStatus = async (
     return { success: false, error };
   }
 };
+
+/**
+ * Delete a video and all its related data
+ * @param videoId The ID of the video to delete
+ * @returns An object containing success status and error if any
+ */
+export const deleteVideo = async (videoId: string): Promise<{ success: boolean; error?: any }> => {
+  try {
+    // First, delete all related data in the correct order to avoid foreign key constraint issues
+    
+    // 1. Delete watch history
+    const { error: watchHistoryError } = await supabase
+      .from('watch_history')
+      .delete()
+      .eq('video_id', videoId);
+      
+    if (watchHistoryError) {
+      console.error('Error deleting watch history:', watchHistoryError);
+      return { success: false, error: watchHistoryError };
+    }
+    
+    // 2. Delete likes
+    const { error: likesError } = await supabase
+      .from('likes')
+      .delete()
+      .eq('video_id', videoId);
+      
+    if (likesError) {
+      console.error('Error deleting likes:', likesError);
+      return { success: false, error: likesError };
+    }
+    
+    // 3. Delete comments
+    const { error: commentsError } = await supabase
+      .from('comments')
+      .delete()
+      .eq('video_id', videoId);
+      
+    if (commentsError) {
+      console.error('Error deleting comments:', commentsError);
+      return { success: false, error: commentsError };
+    }
+    
+    // 4. Delete video analytics
+    const { error: analyticsError } = await supabase
+      .from('video_analytics')
+      .delete()
+      .eq('video_id', videoId);
+      
+    if (analyticsError) {
+      console.error('Error deleting video analytics:', analyticsError);
+      return { success: false, error: analyticsError };
+    }
+    
+    // 5. Finally, delete the video itself
+    const { error: videoError } = await supabase
+      .from('videos')
+      .delete()
+      .eq('id', videoId);
+      
+    if (videoError) {
+      console.error('Error deleting video:', videoError);
+      return { success: false, error: videoError };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error in deleteVideo:', error);
+    return { success: false, error };
+  }
+};

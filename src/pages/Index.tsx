@@ -6,10 +6,14 @@ import EmptyState from '@/components/EmptyState';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger, TabsHeader } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Loader } from 'lucide-react';
 
 interface IndexProps {
   filter?: string;
 }
+
+const VIDEOS_PER_PAGE = 12; // Number of videos to load at once
 
 const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
   const [videos, setVideos] = useState<VideoData[]>([]);
@@ -21,15 +25,31 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState(filter);
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
+  
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [trendingPage, setTrendingPage] = useState(1);
+  const [trendingHasMore, setTrendingHasMore] = useState(true);
+  const [trendingLoadingMore, setTrendingLoadingMore] = useState(false);
+  const [subscriptionPage, setSubscriptionPage] = useState(1);
+  const [subscriptionHasMore, setSubscriptionHasMore] = useState(true);
+  const [subscriptionLoadingMore, setSubscriptionLoadingMore] = useState(false);
 
   useEffect(() => {
     setActiveTab(filter);
   }, [filter]);
 
-  const fetchExploreVideos = async () => {
-    setLoading(true);
+  const fetchExploreVideos = async (pageNum = 1, append = false) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+    
     try {
-      const { data: videosData, error } = await supabase
+      const from = (pageNum - 1) * VIDEOS_PER_PAGE;
+      const to = from + VIDEOS_PER_PAGE - 1;
+      
+      const { data: videosData, error, count } = await supabase
         .from('videos')
         .select(`
           id,
@@ -41,9 +61,10 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           likes_count,
           comments_count,
           category
-        `)
+        `, { count: 'exact' })
         .eq('visibility', 'public')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) {
         throw error;
@@ -77,21 +98,34 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           })
         );
 
-        setVideos(videosWithCreators);
+        if (append) {
+          setVideos(prev => [...prev, ...videosWithCreators]);
+        } else {
+          setVideos(videosWithCreators);
+        }
+        
+        // Check if there are more videos to load
+        setHasMore(count !== null && from + videosData.length < count);
       }
       
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching videos:', error);
       toast.error('Failed to load videos');
+    } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const fetchTrendingVideos = async () => {
-    setTrendingLoading(true);
+  const fetchTrendingVideos = async (pageNum = 1, append = false) => {
+    if (pageNum === 1) setTrendingLoading(true);
+    else setTrendingLoadingMore(true);
+    
     try {
-      const { data: videosData, error } = await supabase
+      const from = (pageNum - 1) * VIDEOS_PER_PAGE;
+      const to = from + VIDEOS_PER_PAGE - 1;
+      
+      const { data: videosData, error, count } = await supabase
         .from('videos')
         .select(`
           id,
@@ -103,10 +137,10 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           likes_count,
           comments_count,
           category
-        `)
+        `, { count: 'exact' })
         .eq('visibility', 'public')
         .order('views', { ascending: false })
-        .limit(15);
+        .range(from, to);
 
       if (error) {
         throw error;
@@ -140,24 +174,34 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           })
         );
 
-        setTrendingVideos(videosWithCreators);
+        if (append) {
+          setTrendingVideos(prev => [...prev, ...videosWithCreators]);
+        } else {
+          setTrendingVideos(videosWithCreators);
+        }
+        
+        // Check if there are more videos to load
+        setTrendingHasMore(count !== null && from + videosData.length < count);
       }
       
-      setTrendingLoading(false);
     } catch (error) {
       console.error('Error fetching trending videos:', error);
       toast.error('Failed to load trending videos');
+    } finally {
       setTrendingLoading(false);
+      setTrendingLoadingMore(false);
     }
   };
 
-  const fetchSubscriptionVideos = async () => {
+  const fetchSubscriptionVideos = async (pageNum = 1, append = false) => {
     if (!currentUser) {
       setSubscriptionsLoading(false);
       return;
     }
     
-    setSubscriptionsLoading(true);
+    if (pageNum === 1) setSubscriptionsLoading(true);
+    else setSubscriptionLoadingMore(true);
+    
     try {
       const { data: subscriptions, error: subError } = await supabase
         .from('subscriptions')
@@ -169,12 +213,16 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
       if (!subscriptions || subscriptions.length === 0) {
         setSubscriptionVideos([]);
         setSubscriptionsLoading(false);
+        setSubscriptionLoadingMore(false);
+        setSubscriptionHasMore(false);
         return;
       }
       
       const creatorIds = subscriptions.map(sub => sub.creator_id);
+      const from = (pageNum - 1) * VIDEOS_PER_PAGE;
+      const to = from + VIDEOS_PER_PAGE - 1;
       
-      const { data: videosData, error } = await supabase
+      const { data: videosData, error, count } = await supabase
         .from('videos')
         .select(`
           id,
@@ -186,10 +234,11 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           likes_count,
           comments_count,
           category
-        `)
+        `, { count: 'exact' })
         .in('user_id', creatorIds)
         .eq('visibility', 'public')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
 
@@ -221,15 +270,38 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           })
         );
 
-        setSubscriptionVideos(videosWithCreators);
+        if (append) {
+          setSubscriptionVideos(prev => [...prev, ...videosWithCreators]);
+        } else {
+          setSubscriptionVideos(videosWithCreators);
+        }
+        
+        // Check if there are more videos to load
+        setSubscriptionHasMore(count !== null && from + videosData.length < count);
       }
       
-      setSubscriptionsLoading(false);
     } catch (error) {
       console.error('Error fetching subscription videos:', error);
       toast.error('Failed to load subscription videos');
+    } finally {
       setSubscriptionsLoading(false);
+      setSubscriptionLoadingMore(false);
     }
+  };
+
+  const loadMoreVideos = () => {
+    setPage(prev => prev + 1);
+    fetchExploreVideos(page + 1, true);
+  };
+
+  const loadMoreTrendingVideos = () => {
+    setTrendingPage(prev => prev + 1);
+    fetchTrendingVideos(trendingPage + 1, true);
+  };
+
+  const loadMoreSubscriptionVideos = () => {
+    setSubscriptionPage(prev => prev + 1);
+    fetchSubscriptionVideos(subscriptionPage + 1, true);
   };
 
   useEffect(() => {
@@ -274,11 +346,6 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           <TabsHeader>
             <h1 className="text-2xl font-semibold text-gray-900 mb-4">Discover VR Experiences</h1>
           </TabsHeader>
-          {/* <TabsList className="mb-4">
-            <TabsTrigger value="home">Home</TabsTrigger>
-            <TabsTrigger value="explore">Explore</TabsTrigger>
-            <TabsTrigger value="trending">Trending</TabsTrigger>
-          </TabsList> */}
           
           <TabsContent value="home">
             {currentUser ? (
@@ -287,11 +354,26 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
                   <div className="loader"></div>
                 </div>
               ) : subscriptionVideos.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                  {subscriptionVideos.map((video) => (
-                    <VideoCard key={video.id} video={video} />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                    {subscriptionVideos.map((video) => (
+                      <VideoCard key={video.id} video={video} />
+                    ))}
+                  </div>
+                  
+                  {subscriptionHasMore && (
+                    <div className="flex justify-center mt-8">
+                      <Button 
+                        onClick={loadMoreSubscriptionVideos} 
+                        disabled={subscriptionLoadingMore}
+                        className="gap-2"
+                      >
+                        {subscriptionLoadingMore && <Loader className="h-4 w-4 animate-spin" />}
+                        Load More Videos
+                      </Button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <EmptyState 
                   title="No subscription videos found" 
@@ -314,11 +396,26 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
                 <div className="loader"></div>
               </div>
             ) : videos.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                {videos.map((video) => (
-                  <VideoCard key={video.id} video={video} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                  {videos.map((video) => (
+                    <VideoCard key={video.id} video={video} />
+                  ))}
+                </div>
+                
+                {hasMore && (
+                  <div className="flex justify-center mt-8">
+                    <Button 
+                      onClick={loadMoreVideos} 
+                      disabled={loadingMore}
+                      className="gap-2"
+                    >
+                      {loadingMore && <Loader className="h-4 w-4 animate-spin" />}
+                      Load More Videos
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <EmptyState />
             )}
@@ -330,11 +427,26 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
                 <div className="loader"></div>
               </div>
             ) : trendingVideos.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                {trendingVideos.map((video) => (
-                  <VideoCard key={video.id} video={video} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                  {trendingVideos.map((video) => (
+                    <VideoCard key={video.id} video={video} />
+                  ))}
+                </div>
+                
+                {trendingHasMore && (
+                  <div className="flex justify-center mt-8">
+                    <Button 
+                      onClick={loadMoreTrendingVideos} 
+                      disabled={trendingLoadingMore}
+                      className="gap-2"
+                    >
+                      {trendingLoadingMore && <Loader className="h-4 w-4 animate-spin" />}
+                      Load More Trending Videos
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <EmptyState title="No trending videos found" description="Check back later for trending content" icon="🔥" />
             )}
