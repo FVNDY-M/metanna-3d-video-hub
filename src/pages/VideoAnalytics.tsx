@@ -331,7 +331,7 @@ const VideoAnalytics = () => {
               </CardHeader>
               <CardContent>
                 {chartData.length > 0 ? (
-                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
+                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[600px]">
                     <ChartContainer
                       config={{
                         views: { label: 'Views', color: '#3b82f6' },
@@ -404,7 +404,7 @@ const VideoAnalytics = () => {
               </CardHeader>
               <CardContent>
                 {chartData.length > 0 ? (
-                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[400px]">
+                  <div className="w-full aspect-[16/9] sm:aspect-[21/9] h-auto max-h-[600px]">
                     <ChartContainer
                       config={{
                         likes: { label: 'Likes', color: '#ec4899' },
