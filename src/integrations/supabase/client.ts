@@ -102,7 +102,18 @@ export const deleteVideo = async (videoId: string): Promise<{ success: boolean; 
   try {
     // First, delete all related data in the correct order to avoid foreign key constraint issues
     
-    // 1. Delete watch history
+    // 1. Delete video analytics - Must be deleted first due to foreign key constraint
+    const { error: analyticsError } = await supabase
+      .from('video_analytics')
+      .delete()
+      .eq('video_id', videoId);
+      
+    if (analyticsError) {
+      console.error('Error deleting video analytics:', analyticsError);
+      return { success: false, error: analyticsError };
+    }
+    
+    // 2. Delete watch history
     const { error: watchHistoryError } = await supabase
       .from('watch_history')
       .delete()
@@ -113,7 +124,7 @@ export const deleteVideo = async (videoId: string): Promise<{ success: boolean; 
       return { success: false, error: watchHistoryError };
     }
     
-    // 2. Delete likes
+    // 3. Delete likes
     const { error: likesError } = await supabase
       .from('likes')
       .delete()
@@ -124,7 +135,7 @@ export const deleteVideo = async (videoId: string): Promise<{ success: boolean; 
       return { success: false, error: likesError };
     }
     
-    // 3. Delete comments
+    // 4. Delete comments
     const { error: commentsError } = await supabase
       .from('comments')
       .delete()
@@ -133,17 +144,6 @@ export const deleteVideo = async (videoId: string): Promise<{ success: boolean; 
     if (commentsError) {
       console.error('Error deleting comments:', commentsError);
       return { success: false, error: commentsError };
-    }
-    
-    // 4. Delete video analytics - This is the key change to fix the foreign key constraint
-    const { error: analyticsError } = await supabase
-      .from('video_analytics')
-      .delete()
-      .eq('video_id', videoId);
-      
-    if (analyticsError) {
-      console.error('Error deleting video analytics:', analyticsError);
-      return { success: false, error: analyticsError };
     }
     
     // 5. Finally, delete the video itself
