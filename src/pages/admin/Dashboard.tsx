@@ -57,33 +57,69 @@ const AdminDashboard = () => {
   const { data: statsData, isLoading: isStatsLoading } = useQuery({
     queryKey: ['admin-dashboard-stats'],
     queryFn: async () => {
-      // Fetch platform statistics in parallel
-      const [
-        { count: totalVideos, error: videosError },
-        { count: totalUsers, error: usersError },
-        { count: totalLikes, error: likesError },
-        { count: totalComments, error: commentsError },
-        { data: recentActions, error: actionsError },
-        { data: contentCreators, error: creatorError }
-      ] = await Promise.all([
-        supabase.from('videos').select('*', { count: 'exact', head: true }),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('likes').select('*', { count: 'exact', head: true }),
-        supabase.from('comments').select('*', { count: 'exact', head: true }),
-        supabase
-          .from('moderation_actions')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        supabase
-          .from('profiles')
-          .select('id')
-          .in('id', supabase.from('videos').select('user_id').eq('visibility', 'public'))
-      ]);
+      // Get total videos count
+      const { count: totalVideos, error: videosError } = await supabase
+        .from('videos')
+        .select('*', { count: 'exact', head: true });
 
-      if (videosError || usersError || likesError || commentsError || actionsError || creatorError) {
-        console.error("Error fetching stats:", videosError || usersError || likesError || commentsError || actionsError || creatorError);
-        throw new Error("Failed to fetch dashboard statistics");
+      if (videosError) {
+        console.error("Error fetching videos count:", videosError);
+        throw new Error("Failed to fetch videos statistics");
+      }
+
+      // Get total users count
+      const { count: totalUsers, error: usersError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (usersError) {
+        console.error("Error fetching users count:", usersError);
+        throw new Error("Failed to fetch users statistics");
+      }
+
+      // Get total likes count
+      const { count: totalLikes, error: likesError } = await supabase
+        .from('likes')
+        .select('*', { count: 'exact', head: true });
+
+      if (likesError) {
+        console.error("Error fetching likes count:", likesError);
+        throw new Error("Failed to fetch likes statistics");
+      }
+
+      // Get total comments count
+      const { count: totalComments, error: commentsError } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true });
+
+      if (commentsError) {
+        console.error("Error fetching comments count:", commentsError);
+        throw new Error("Failed to fetch comments statistics");
+      }
+
+      // Get recent moderation actions
+      const { data: recentActions, error: actionsError } = await supabase
+        .from('moderation_actions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (actionsError) {
+        console.error("Error fetching moderation actions:", actionsError);
+        throw new Error("Failed to fetch moderation actions");
+      }
+
+      // Get content creators (users who have uploaded videos)
+      const { data: contentCreators, error: creatorError } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('id', 
+          supabase.from('videos').select('user_id').eq('visibility', 'public')
+        );
+
+      if (creatorError) {
+        console.error("Error fetching content creators:", creatorError);
+        throw new Error("Failed to fetch creator statistics");
       }
 
       // Calculate active vs normal users
