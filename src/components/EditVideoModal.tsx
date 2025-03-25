@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
@@ -21,13 +22,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
-import { CropIcon, Upload } from 'lucide-react';
+import { CropIcon, Upload, Trash2 } from 'lucide-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 
 interface EditVideoModalProps {
   isOpen: boolean;
   onClose: () => void;
   videoId: string | null;
   onVideoUpdated?: () => void;
+  onVideoDeleted?: (videoId: string) => Promise<void>;
 }
 
 const videoCategories = [
@@ -50,12 +54,14 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   isOpen, 
   onClose, 
   videoId,
-  onVideoUpdated
+  onVideoUpdated,
+  onVideoDeleted
 }) => {
   const [video, setVideo] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -287,6 +293,21 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     }
   };
 
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!videoId || !onVideoDeleted) return;
+    try {
+      await onVideoDeleted(videoId);
+    } catch (error) {
+      console.error('Error in delete confirmation handler:', error);
+    } finally {
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -406,15 +427,50 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
             </div>
 
             <DialogFooter className="mt-6">
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSave} 
-                disabled={saving || uploadingThumbnail || !title.trim()}
-              >
-                {saving || uploadingThumbnail ? 'Saving...' : 'Save Changes'}
-              </Button>
+              <div className="flex w-full justify-between items-center">
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+                      onClick={handleDeleteClick}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Video
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete this video and all associated data including comments,
+                        likes, and watch history. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        className="bg-red-500 hover:bg-red-600"
+                        onClick={handleDeleteConfirm}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={onClose}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={saving || uploadingThumbnail || !title.trim()}
+                  >
+                    {saving || uploadingThumbnail ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
+              </div>
             </DialogFooter>
           </div>
         ) : (
