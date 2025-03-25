@@ -109,13 +109,25 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch moderation actions");
       }
 
+      // First get the IDs of users who have videos
+      const { data: creatorIdsData, error: creatorQueryError } = await supabase
+        .from('videos')
+        .select('user_id')
+        .eq('visibility', 'public');
+
+      if (creatorQueryError) {
+        console.error("Error fetching creator IDs:", creatorQueryError);
+        throw new Error("Failed to fetch creator IDs");
+      }
+      
+      // Extract the actual IDs from the result
+      const creatorIds = creatorIdsData.map(item => item.user_id);
+
       // Get content creators (users who have uploaded videos)
       const { data: contentCreators, error: creatorError } = await supabase
         .from('profiles')
         .select('id')
-        .in('id', 
-          supabase.from('videos').select('user_id').eq('visibility', 'public')
-        );
+        .in('id', creatorIds);
 
       if (creatorError) {
         console.error("Error fetching content creators:", creatorError);
