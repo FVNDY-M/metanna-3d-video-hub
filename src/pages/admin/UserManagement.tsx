@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, User, X, Ban, CheckCircle, Eye, Trash2 } from 'lucide-react';
+import { Search, User, X, Ban, CheckCircle, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -24,22 +24,8 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
 import AdminLayout from '@/components/AdminLayout';
-import { SuspensionDuration } from '@/types/moderation';
-import { deleteUser } from '@/integrations/supabase/client';
 
 const UserManagement = () => {
   // States for filters
@@ -50,10 +36,6 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState('');
-  const [suspensionDuration, setSuspensionDuration] = useState<SuspensionDuration>('permanent');
-  
-  // States for delete confirmation
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Fetch users
   const { data: users, isLoading, refetch } = useQuery({
@@ -88,18 +70,6 @@ const UserManagement = () => {
     user.bio?.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
-  // Calculate suspension end date based on duration
-  const calculateSuspensionEndDate = (duration: SuspensionDuration): string | null => {
-    if (duration === 'permanent') {
-      return null;
-    }
-    
-    // For 3 days suspension
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 3);
-    return endDate.toISOString();
-  };
-  
   // Handle user suspension/restoration
   const handleToggleSuspension = async () => {
     if (!selectedUser) return;
@@ -107,31 +77,13 @@ const UserManagement = () => {
     const isSuspending = !selectedUser.is_suspended;
     
     try {
-      // For restoration, clear the suspension_end_date
-      if (!isSuspending) {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ 
-            is_suspended: false,
-            suspension_end_date: null 
-          })
-          .eq('id', selectedUser.id);
-        
-        if (updateError) throw updateError;
-      } else {
-        // For suspension, set the end date based on the chosen duration
-        const suspensionEndDate = calculateSuspensionEndDate(suspensionDuration);
-        
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ 
-            is_suspended: true,
-            suspension_end_date: suspensionEndDate 
-          })
-          .eq('id', selectedUser.id);
-        
-        if (updateError) throw updateError;
-      }
+      // Update user status
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ is_suspended: isSuspending })
+        .eq('id', selectedUser.id);
+      
+      if (updateError) throw updateError;
       
       // Log the moderation action
       const { error: logError } = await supabase
@@ -143,9 +95,7 @@ const UserManagement = () => {
           target_id: selectedUser.id,
           details: { 
             username: selectedUser.username,
-            reason: isSuspending ? suspensionReason || "Policy violation" : "Account review completed",
-            duration: isSuspending ? suspensionDuration : null,
-            suspension_end_date: isSuspending ? calculateSuspensionEndDate(suspensionDuration) : null
+            reason: isSuspending ? suspensionReason || "Policy violation" : "Account review completed"
           }
         });
       
@@ -153,7 +103,7 @@ const UserManagement = () => {
       
       toast.success(
         isSuspending 
-          ? `User ${selectedUser.username} has been suspended ${suspensionDuration === '3days' ? 'for 3 days' : 'indefinitely'}` 
+          ? `User ${selectedUser.username} has been suspended` 
           : `User ${selectedUser.username} has been restored`
       );
       
@@ -168,40 +118,11 @@ const UserManagement = () => {
     }
   };
   
-  // Handle user deletion
-  const handleDeleteUser = async () => {
-    if (!selectedUser) return;
-    
-    try {
-      const { success, error } = await deleteUser(selectedUser.id);
-      
-      if (!success || error) {
-        throw error || new Error("Failed to delete user");
-      }
-      
-      toast.success(`User ${selectedUser.username} has been permanently deleted`);
-      refetch();
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      toast.error("Failed to delete user");
-    } finally {
-      setIsDeleteDialogOpen(false);
-      setSelectedUser(null);
-    }
-  };
-  
   // Open suspend/restore dialog
   const openSuspendDialog = (user: any) => {
     setSelectedUser(user);
     setIsSuspendDialogOpen(true);
     setSuspensionReason('');
-    setSuspensionDuration('permanent');
-  };
-  
-  // Open delete confirmation dialog
-  const openDeleteDialog = (user: any) => {
-    setSelectedUser(user);
-    setIsDeleteDialogOpen(true);
   };
   
   // Format date for display
@@ -302,9 +223,6 @@ const UserManagement = () => {
                     {user.is_suspended ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         Suspended
-                        {user.suspension_end_date && (
-                          <span className="ml-1">until {formatDate(user.suspension_end_date)}</span>
-                        )}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -331,16 +249,6 @@ const UserManagement = () => {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => openDeleteDialog(user)}
-                        title="Delete user"
-                        className="text-red-600 hover:text-red-700"
-                        disabled={user.role === 'admin'} // Don't allow deleting admins
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
                         asChild
                         title="View profile"
                       >
@@ -359,7 +267,7 @@ const UserManagement = () => {
       
       {/* Suspend/Restore User Dialog */}
       <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>
               {selectedUser?.is_suspended ? "Restore User Account" : "Suspend User Account"}
@@ -390,34 +298,15 @@ const UserManagement = () => {
               </div>
               
               {!selectedUser.is_suspended && (
-                <>
-                  <div className="space-y-3 mb-4">
-                    <Label>Suspension Duration</Label>
-                    <RadioGroup 
-                      value={suspensionDuration} 
-                      onValueChange={(value) => setSuspensionDuration(value as SuspensionDuration)}
-                      className="flex flex-col space-y-2"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="3days" id="duration-3days" />
-                        <Label htmlFor="duration-3days" className="cursor-pointer">Suspend for 3 days</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="permanent" id="duration-permanent" />
-                        <Label htmlFor="duration-permanent" className="cursor-pointer">Suspend indefinitely</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Reason for suspension</label>
-                    <Textarea 
-                      value={suspensionReason} 
-                      onChange={(e) => setSuspensionReason(e.target.value)}
-                      placeholder="Provide a reason for suspension (optional)"
-                      rows={3}
-                    />
-                  </div>
-                </>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Reason for suspension</label>
+                  <Textarea 
+                    value={suspensionReason} 
+                    onChange={(e) => setSuspensionReason(e.target.value)}
+                    placeholder="Provide a reason for suspension (optional)"
+                    rows={3}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -435,29 +324,6 @@ const UserManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Delete User Confirmation */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Permanently Delete User</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the user account and all associated data.
-              {selectedUser && (
-                <div className="mt-2 font-medium">
-                  Username: {selectedUser.username}
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-red-600 hover:bg-red-700">
-              Delete Permanently
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </AdminLayout>
   );
 };

@@ -1,5 +1,0 @@
-
-project_id = "zdfwczmxucakglnyedrh"
-
-[[check-expired-suspensions.triggers.cron]]
-schedule = "0 0 * * *" # Run once a day at midnight
