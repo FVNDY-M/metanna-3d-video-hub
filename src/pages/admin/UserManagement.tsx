@@ -1,13 +1,12 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, User, X, Ban, CheckCircle, Eye, Clock } from 'lucide-react';
+import { Search, User, X, Ban, CheckCircle, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { 
   Dialog, 
@@ -28,14 +27,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/AdminLayout';
 
-// Suspension duration options
-const suspensionDurations = [
-  { value: '3d', label: '3 days' },
-  { value: '15d', label: '15 days' },
-  { value: '30d', label: '1 month' },
-  { value: 'permanent', label: 'Permanent' }
-];
-
 const UserManagement = () => {
   // States for filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,7 +36,6 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState('');
-  const [suspensionDuration, setSuspensionDuration] = useState<string>('');
   
   // Fetch users
   const { data: users, isLoading, refetch } = useQuery({
@@ -105,8 +95,7 @@ const UserManagement = () => {
           target_id: selectedUser.id,
           details: { 
             username: selectedUser.username,
-            reason: isSuspending ? suspensionReason || "Policy violation" : "Account review completed",
-            duration: isSuspending ? suspensionDuration : null
+            reason: isSuspending ? suspensionReason || "Policy violation" : "Account review completed"
           }
         });
       
@@ -126,7 +115,6 @@ const UserManagement = () => {
       setIsSuspendDialogOpen(false);
       setSelectedUser(null);
       setSuspensionReason('');
-      setSuspensionDuration('');
     }
   };
   
@@ -135,7 +123,6 @@ const UserManagement = () => {
     setSelectedUser(user);
     setIsSuspendDialogOpen(true);
     setSuspensionReason('');
-    setSuspensionDuration('');
   };
   
   // Format date for display
@@ -311,32 +298,14 @@ const UserManagement = () => {
               </div>
               
               {!selectedUser.is_suspended && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Suspension Duration</Label>
-                    <Select value={suspensionDuration} onValueChange={setSuspensionDuration}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select suspension duration" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suspensionDurations.map((duration) => (
-                          <SelectItem key={duration.value} value={duration.value}>
-                            {duration.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Reason for suspension</Label>
-                    <Textarea 
-                      value={suspensionReason} 
-                      onChange={(e) => setSuspensionReason(e.target.value)}
-                      placeholder="Provide a reason for suspension (optional)"
-                      rows={3}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Reason for suspension</label>
+                  <Textarea 
+                    value={suspensionReason} 
+                    onChange={(e) => setSuspensionReason(e.target.value)}
+                    placeholder="Provide a reason for suspension (optional)"
+                    rows={3}
+                  />
                 </div>
               )}
             </div>
@@ -349,7 +318,6 @@ const UserManagement = () => {
             <Button 
               onClick={handleToggleSuspension}
               variant={selectedUser?.is_suspended ? "default" : "destructive"}
-              disabled={!selectedUser?.is_suspended && !suspensionDuration}
             >
               {selectedUser?.is_suspended ? "Restore Account" : "Suspend Account"}
             </Button>

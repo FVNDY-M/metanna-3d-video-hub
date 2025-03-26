@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
@@ -31,7 +32,6 @@ interface EditVideoModalProps {
   videoId: string | null;
   onVideoUpdated?: () => void;
   onVideoDeleted?: (videoId: string) => Promise<void>;
-  isAdmin?: boolean;
 }
 
 const videoCategories = [
@@ -50,20 +50,12 @@ const videoCategories = [
   'Uncategorized'
 ];
 
-const suspensionDurations = [
-  { value: '3d', label: '3 days' },
-  { value: '15d', label: '15 days' },
-  { value: '30d', label: '1 month' },
-  { value: 'permanent', label: 'Permanent' }
-];
-
 const EditVideoModal: React.FC<EditVideoModalProps> = ({ 
   isOpen, 
   onClose, 
   videoId,
   onVideoUpdated,
-  onVideoDeleted,
-  isAdmin = false
+  onVideoDeleted
 }) => {
   const [video, setVideo] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +64,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
+  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -79,7 +72,6 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [thumbnailCropped, setThumbnailCropped] = useState<Blob | null>(null);
-  const [suspensionDuration, setSuspensionDuration] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thumbnailCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -105,8 +97,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
             views,
             likes_count,
             comments_count,
-            visibility,
-            is_suspended
+            visibility
           `)
           .eq('id', videoId)
           .single();
@@ -137,8 +128,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
             comments: videoData.comments_count || 0,
             immersions: videoData.views || 0,
             createdAt: videoData.created_at,
-            visibility: videoData.visibility as 'public' | 'private',
-            isSuspended: videoData.is_suspended
+            visibility: videoData.visibility as 'public' | 'private'
           };
           
           setVideo(processedVideo);
@@ -308,39 +298,15 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
         }
       }
       
-      const updateData: any = {
-        title,
-        description,
-        category,
-        visibility,
-        ...(thumbnailUrl && { thumbnail_url: thumbnailUrl })
-      };
-      
-      if (isAdmin && video?.isSuspended !== undefined) {
-        if (suspensionDuration && !video.isSuspended) {
-          updateData.is_suspended = true;
-          await supabase
-            .from('moderation_actions')
-            .insert({
-              admin_id: (await supabase.auth.getSession()).data.session?.user.id,
-              action_type: 'video_suspend',
-              target_type: 'video',
-              target_id: videoId,
-              details: { 
-                duration: suspensionDuration,
-                video_title: title,
-                reason: "Policy violation"
-              }
-            });
-        } 
-        else if (video.isSuspended) {
-          updateData.is_suspended = false;
-        }
-      }
-      
       const { error } = await supabase
         .from('videos')
-        .update(updateData)
+        .update({
+          title,
+          description,
+          category,
+          visibility,
+          ...(thumbnailUrl && { thumbnail_url: thumbnailUrl })
+        })
         .eq('id', videoId);
 
       if (error) throw error;
@@ -447,47 +413,6 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
                     </div>
                   </RadioGroup>
                 </div>
-
-                {isAdmin && (
-                  <div className="space-y-2 mt-4 p-3 border border-amber-200 bg-amber-50 rounded-md">
-                    <Label htmlFor="suspension" className="font-medium text-amber-700">
-                      {video.isSuspended ? 'Video is Currently Suspended' : 'Suspension Options'}
-                    </Label>
-                    
-                    {!video.isSuspended && (
-                      <Select value={suspensionDuration} onValueChange={setSuspensionDuration}>
-                        <SelectTrigger id="suspension">
-                          <SelectValue placeholder="Select suspension duration" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">No suspension</SelectItem>
-                          {suspensionDurations.map((duration) => (
-                            <SelectItem key={duration.value} value={duration.value}>
-                              {duration.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    
-                    {video.isSuspended && (
-                      <Button 
-                        variant="outline" 
-                        className="mt-2 border-amber-500 text-amber-700 hover:bg-amber-100"
-                        onClick={() => {
-                          const updateData: any = {};
-                          updateData.is_suspended = false;
-                          supabase
-                            .from('videos')
-                            .update(updateData)
-                            .eq('id', videoId);
-                        }}
-                      >
-                        Restore Video
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
               
               <div className="col-span-4">

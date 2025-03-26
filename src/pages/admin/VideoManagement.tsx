@@ -1,14 +1,12 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, Edit, AlertTriangle, CheckCircle, Search, X, Clock } from 'lucide-react';
+import { Eye, Edit, AlertTriangle, CheckCircle, Search, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import EditVideoModal from '@/components/EditVideoModal';
 import { 
   Dialog, 
   DialogContent, 
@@ -53,14 +51,6 @@ interface Video {
   user?: UserProfile;
 }
 
-// Suspension duration options
-const suspensionDurations = [
-  { value: '3d', label: '3 days' },
-  { value: '15d', label: '15 days' },
-  { value: '30d', label: '1 month' },
-  { value: 'permanent', label: 'Permanent' }
-];
-
 const VideoManagement = () => {
   // States for filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,9 +58,13 @@ const VideoManagement = () => {
   
   // States for modals
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
-  const [suspensionDuration, setSuspensionDuration] = useState<string>('');
+  
+  // Edit form states
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState('');
   
   // Fetch videos with creator info
   const { data: videos, isLoading, refetch } = useQuery({
@@ -158,8 +152,7 @@ const VideoManagement = () => {
           target_id: selectedVideo.id,
           details: { 
             video_title: selectedVideo.title,
-            reason: isSuspending ? "Policy violation" : "Review completed",
-            duration: isSuspending ? suspensionDuration : null
+            reason: isSuspending ? "Policy violation" : "Review completed"
           }
         });
       
@@ -178,41 +171,73 @@ const VideoManagement = () => {
     } finally {
       setIsSuspendDialogOpen(false);
       setSelectedVideo(null);
-      setSuspensionDuration('');
     }
   };
   
-  // Handle video deletion
-  const handleVideoDeleted = async (videoId: string) => {
+  // Handle video edit
+  const handleEditVideo = async () => {
+    if (!selectedVideo) return;
+    
     try {
-      // Delete video
-      const { error: deleteError } = await supabase
+      // Update video details
+      const { error: updateError } = await supabase
         .from('videos')
-        .delete()
-        .eq('id', videoId);
+        .update({
+          title: editTitle,
+          description: editDescription,
+          category: editCategory
+        })
+        .eq('id', selectedVideo.id);
       
-      if (deleteError) throw deleteError;
+      if (updateError) throw updateError;
       
-      toast.success("Video has been deleted");
+      // Log the moderation action
+      const { error: logError } = await supabase
+        .from('moderation_actions')
+        .insert({
+          admin_id: (await supabase.auth.getSession()).data.session?.user.id,
+          action_type: 'video_edit',
+          target_type: 'video',
+          target_id: selectedVideo.id,
+          details: { 
+            previous_title: selectedVideo.title,
+            new_title: editTitle,
+            updated_fields: ['title', 'description', 'category'].filter(field => {
+              switch (field) {
+                case 'title': return editTitle !== selectedVideo.title;
+                case 'description': return editDescription !== selectedVideo.description;
+                case 'category': return editCategory !== selectedVideo.category;
+                default: return false;
+              }
+            })
+          }
+        });
+      
+      if (logError) throw logError;
+      
+      toast.success("Video details updated successfully");
       refetch();
-      setIsEditModalOpen(false); // Close the edit modal
     } catch (error) {
-      console.error("Error deleting video:", error);
-      toast.error("Failed to delete video");
-      return Promise.reject(error);
+      console.error("Error updating video:", error);
+      toast.error("Failed to update video details");
+    } finally {
+      setIsEditDialogOpen(false);
+      setSelectedVideo(null);
     }
   };
   
-  // Open edit dialog
+  // Open edit dialog and set form values
   const openEditDialog = (video: Video) => {
     setSelectedVideo(video);
-    setIsEditModalOpen(true);
+    setEditTitle(video.title);
+    setEditDescription(video.description || '');
+    setEditCategory(video.category || 'Uncategorized');
+    setIsEditDialogOpen(true);
   };
   
   // Open suspend/restore dialog
   const openSuspendDialog = (video: Video) => {
     setSelectedVideo(video);
-    setSuspensionDuration('');
     setIsSuspendDialogOpen(true);
   };
   
@@ -350,17 +375,69 @@ const VideoManagement = () => {
         </div>
       )}
       
-      {/* Direct edit using our EditVideoModal component */}
-      {selectedVideo && (
-        <EditVideoModal
-          isOpen={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
-          videoId={selectedVideo.id}
-          onVideoUpdated={refetch}
-          onVideoDeleted={handleVideoDeleted}
-          isAdmin={true} // Pass the admin flag
-        />
-      )}
+      {/* Edit Video Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Edit Video</DialogTitle>
+            <DialogDescription>
+              Update the video details. These changes will be visible to all users.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Title</label>
+              <Input 
+                value={editTitle} 
+                onChange={(e) => setEditTitle(e.target.value)}
+                maxLength={100}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Textarea 
+                value={editDescription} 
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={4}
+                maxLength={500}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <Select value={editCategory} onValueChange={setEditCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Uncategorized">Uncategorized</SelectItem>
+                  <SelectItem value="Entertainment">Entertainment</SelectItem>
+                  <SelectItem value="Education">Education</SelectItem>
+                  <SelectItem value="Science">Science</SelectItem>
+                  <SelectItem value="Tech">Tech</SelectItem>
+                  <SelectItem value="Arts">Arts</SelectItem>
+                  <SelectItem value="Sports">Sports</SelectItem>
+                  <SelectItem value="Travel">Travel</SelectItem>
+                  <SelectItem value="Gaming">Gaming</SelectItem>
+                  <SelectItem value="Music">Music</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditVideo} disabled={!editTitle.trim()}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Suspend/Restore Video Dialog */}
       <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
@@ -383,24 +460,6 @@ const VideoManagement = () => {
               <p className="text-sm text-gray-500 mt-1">
                 By: {selectedVideo.user?.username || "Unknown creator"}
               </p>
-
-              {!selectedVideo.is_suspended && (
-                <div className="mt-4 space-y-2">
-                  <Label className="text-sm font-medium">Suspension Duration</Label>
-                  <Select value={suspensionDuration} onValueChange={setSuspensionDuration}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select suspension duration" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suspensionDurations.map((duration) => (
-                        <SelectItem key={duration.value} value={duration.value}>
-                          {duration.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
           )}
           
@@ -411,7 +470,6 @@ const VideoManagement = () => {
             <Button 
               onClick={handleToggleSuspension}
               variant={selectedVideo?.is_suspended ? "default" : "destructive"}
-              disabled={!selectedVideo?.is_suspended && !suspensionDuration}
             >
               {selectedVideo?.is_suspended ? "Restore Video" : "Suspend Video"}
             </Button>
