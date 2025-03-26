@@ -185,7 +185,8 @@ const VideoManagement = () => {
         .update({
           title: editTitle,
           description: editDescription,
-          category: editCategory
+          category: editCategory,
+          updated_at: new Date().toISOString() // Add this line to update the timestamp
         })
         .eq('id', selectedVideo.id);
       
@@ -216,7 +217,7 @@ const VideoManagement = () => {
       if (logError) throw logError;
       
       toast.success("Video details updated successfully");
-      refetch();
+      refetch(); // Make sure to refetch to update the UI with the new data
     } catch (error) {
       console.error("Error updating video:", error);
       toast.error("Failed to update video details");

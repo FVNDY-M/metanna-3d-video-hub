@@ -298,19 +298,30 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
         }
       }
       
-      const { error } = await supabase
-        .from('videos')
-        .update({
-          title,
-          description,
-          category,
-          visibility,
-          ...(thumbnailUrl && { thumbnail_url: thumbnailUrl })
-        })
-        .eq('id', videoId);
-
-      if (error) throw error;
+      // Update the updated_at timestamp when saving changes
+      const updateData = {
+        title,
+        description,
+        category,
+        visibility,
+        updated_at: new Date().toISOString(),
+        ...(thumbnailUrl && { thumbnail_url: thumbnailUrl })
+      };
       
+      console.log('Updating video with data:', updateData);
+      
+      const { error, data } = await supabase
+        .from('videos')
+        .update(updateData)
+        .eq('id', videoId)
+        .select();
+
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
+      
+      console.log('Video updated successfully:', data);
       toast.success('Video updated successfully');
       
       if (onVideoUpdated) {
