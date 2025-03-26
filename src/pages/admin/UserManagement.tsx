@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, User, X, Ban, CheckCircle, Eye } from 'lucide-react';
+import { Search, User, X, Ban, CheckCircle, Eye, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,9 +23,23 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { 
+  RadioGroup,
+  RadioGroupItem 
+} from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/AdminLayout';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const UserManagement = () => {
   // States for filters
@@ -36,6 +50,10 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState('');
+  const [suspensionDuration, setSuspensionDuration] = useState('permanent');
+  
+  // States for delete modal
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Fetch users
   const { data: users, isLoading, refetch } = useQuery({
@@ -77,10 +95,22 @@ const UserManagement = () => {
     const isSuspending = !selectedUser.is_suspended;
     
     try {
+      let suspensionEndDate = null;
+      
+      // If suspending and duration is 3 days, calculate end date
+      if (isSuspending && suspensionDuration === '3days') {
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 3);
+        suspensionEndDate = endDate.toISOString();
+      }
+      
       // Update user status
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ is_suspended: isSuspending })
+        .update({ 
+          is_suspended: isSuspending,
+          suspension_end_date: suspensionEndDate
+        })
         .eq('id', selectedUser.id);
       
       if (updateError) throw updateError;
@@ -95,7 +125,9 @@ const UserManagement = () => {
           target_id: selectedUser.id,
           details: { 
             username: selectedUser.username,
-            reason: isSuspending ? suspensionReason || "Policy violation" : "Account review completed"
+            reason: isSuspending ? suspensionReason || "Policy violation" : "Account review completed",
+            duration: isSuspending ? suspensionDuration : null,
+            suspension_end_date: suspensionEndDate
           }
         });
       
@@ -103,7 +135,7 @@ const UserManagement = () => {
       
       toast.success(
         isSuspending 
-          ? `User ${selectedUser.username} has been suspended` 
+          ? `User ${selectedUser.username} has been suspended${suspensionDuration === '3days' ? ' for 3 days' : ' permanently'}` 
           : `User ${selectedUser.username} has been restored`
       );
       
@@ -115,6 +147,47 @@ const UserManagement = () => {
       setIsSuspendDialogOpen(false);
       setSelectedUser(null);
       setSuspensionReason('');
+      setSuspensionDuration('permanent');
+    }
+  };
+  
+  // Handle user deletion
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      // Log the moderation action first in case deletion succeeds
+      const { error: logError } = await supabase
+        .from('moderation_actions')
+        .insert({
+          admin_id: (await supabase.auth.getSession()).data.session?.user.id,
+          action_type: 'user_delete',
+          target_type: 'user',
+          target_id: selectedUser.id,
+          details: { 
+            username: selectedUser.username,
+            reason: "Account deletion by admin"
+          }
+        });
+        
+      if (logError) throw logError;
+      
+      // Delete the user
+      // Note: This relies on cascade delete to remove related data
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(
+        selectedUser.id
+      );
+      
+      if (deleteError) throw deleteError;
+      
+      toast.success(`User ${selectedUser.username} has been permanently deleted`);
+      refetch();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Failed to delete user account");
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSelectedUser(null);
     }
   };
   
@@ -123,6 +196,13 @@ const UserManagement = () => {
     setSelectedUser(user);
     setIsSuspendDialogOpen(true);
     setSuspensionReason('');
+    setSuspensionDuration('permanent');
+  };
+  
+  // Open delete dialog
+  const openDeleteDialog = (user: any) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
   };
   
   // Format date for display
@@ -222,7 +302,7 @@ const UserManagement = () => {
                   <TableCell>
                     {user.is_suspended ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        Suspended
+                        {user.suspension_end_date ? 'Temp Suspended' : 'Suspended'}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -248,6 +328,16 @@ const UserManagement = () => {
                       </Button>
                       <Button 
                         variant="ghost" 
+                        size="sm"
+                        title="Delete user"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => openDeleteDialog(user)}
+                        disabled={user.role === 'admin'} // Don't allow deleting admins
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
                         size="sm" 
                         asChild
                         title="View profile"
@@ -267,7 +357,7 @@ const UserManagement = () => {
       
       {/* Suspend/Restore User Dialog */}
       <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>
               {selectedUser?.is_suspended ? "Restore User Account" : "Suspend User Account"}
@@ -298,15 +388,41 @@ const UserManagement = () => {
               </div>
               
               {!selectedUser.is_suspended && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Reason for suspension</label>
-                  <Textarea 
-                    value={suspensionReason} 
-                    onChange={(e) => setSuspensionReason(e.target.value)}
-                    placeholder="Provide a reason for suspension (optional)"
-                    rows={3}
-                  />
-                </div>
+                <>
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Suspension Duration</h4>
+                      <RadioGroup 
+                        value={suspensionDuration} 
+                        onValueChange={setSuspensionDuration}
+                        className="flex flex-col space-y-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="3days" id="3days" />
+                          <label htmlFor="3days" className="text-sm font-medium">
+                            Suspend for 3 days
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="permanent" id="permanent" />
+                          <label htmlFor="permanent" className="text-sm font-medium">
+                            Suspend permanently
+                          </label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reason for suspension</label>
+                      <Textarea 
+                        value={suspensionReason} 
+                        onChange={(e) => setSuspensionReason(e.target.value)}
+                        placeholder="Provide a reason for suspension (optional)"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -324,6 +440,32 @@ const UserManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Delete User Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently Delete User Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The account and all associated data will be permanently deleted.
+              {selectedUser?.username && (
+                <div className="mt-2 font-medium text-destructive">
+                  User: {selectedUser.username}
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 };

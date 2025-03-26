@@ -136,6 +136,7 @@ export type Database = {
           is_suspended: boolean | null
           role: string | null
           subscriber_count: number
+          suspension_end_date: string | null
           updated_at: string
           username: string
         }
@@ -147,6 +148,7 @@ export type Database = {
           is_suspended?: boolean | null
           role?: string | null
           subscriber_count?: number
+          suspension_end_date?: string | null
           updated_at?: string
           username: string
         }
@@ -158,6 +160,7 @@ export type Database = {
           is_suspended?: boolean | null
           role?: string | null
           subscriber_count?: number
+          suspension_end_date?: string | null
           updated_at?: string
           username?: string
         }
@@ -237,6 +240,7 @@ export type Database = {
           id: string
           is_suspended: boolean | null
           likes_count: number
+          suspension_end_date: string | null
           thumbnail_url: string | null
           title: string
           updated_at: string
@@ -253,6 +257,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           likes_count?: number
+          suspension_end_date?: string | null
           thumbnail_url?: string | null
           title: string
           updated_at?: string
@@ -269,6 +274,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           likes_count?: number
+          suspension_end_date?: string | null
           thumbnail_url?: string | null
           title?: string
           updated_at?: string
@@ -322,6 +328,14 @@ export type Database = {
           row_id: string
         }
         Returns: number
+      }
+      invoke_lift_suspensions_function: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      lift_expired_suspensions: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {
