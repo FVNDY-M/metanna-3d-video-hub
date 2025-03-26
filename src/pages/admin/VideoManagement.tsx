@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, Edit, AlertTriangle, CheckCircle, Search, X } from 'lucide-react';
+import { Eye, Edit, AlertTriangle, CheckCircle, Search, X, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, deleteVideo } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -23,8 +23,21 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
 import AdminLayout from '@/components/AdminLayout';
+import { SuspensionDuration } from '@/types/moderation';
 
 // Define interfaces for our data
 interface UserProfile {
@@ -48,6 +61,7 @@ interface Video {
   thumbnail_url: string | null;
   visibility: string;
   is_suspended: boolean;
+  suspension_end_date?: string | null;
   user?: UserProfile;
 }
 
@@ -60,11 +74,15 @@ const VideoManagement = () => {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Edit form states
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editCategory, setEditCategory] = useState('');
+  
+  // Suspension states
+  const [suspensionDuration, setSuspensionDuration] = useState<SuspensionDuration>('permanent');
   
   // Fetch videos with creator info
   const { data: videos, isLoading, refetch } = useQuery({
@@ -127,6 +145,18 @@ const VideoManagement = () => {
     );
   }, [videos, searchQuery]);
   
+  // Calculate suspension end date based on duration
+  const calculateSuspensionEndDate = (duration: SuspensionDuration): string | null => {
+    if (duration === 'permanent') {
+      return null;
+    }
+    
+    // For 3 days suspension
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 3);
+    return endDate.toISOString();
+  };
+  
   // Handle video suspension/restoration
   const handleToggleSuspension = async () => {
     if (!selectedVideo) return;
@@ -134,13 +164,31 @@ const VideoManagement = () => {
     const isSuspending = !selectedVideo.is_suspended;
     
     try {
-      // Update video status
-      const { error: updateError } = await supabase
-        .from('videos')
-        .update({ is_suspended: isSuspending })
-        .eq('id', selectedVideo.id);
-      
-      if (updateError) throw updateError;
+      // For restoration, clear the suspension_end_date
+      if (!isSuspending) {
+        const { error: updateError } = await supabase
+          .from('videos')
+          .update({ 
+            is_suspended: false,
+            suspension_end_date: null 
+          })
+          .eq('id', selectedVideo.id);
+        
+        if (updateError) throw updateError;
+      } else {
+        // For suspension, set the end date based on the chosen duration
+        const suspensionEndDate = calculateSuspensionEndDate(suspensionDuration);
+        
+        const { error: updateError } = await supabase
+          .from('videos')
+          .update({ 
+            is_suspended: true,
+            suspension_end_date: suspensionEndDate 
+          })
+          .eq('id', selectedVideo.id);
+        
+        if (updateError) throw updateError;
+      }
       
       // Log the moderation action
       const { error: logError } = await supabase
@@ -152,7 +200,9 @@ const VideoManagement = () => {
           target_id: selectedVideo.id,
           details: { 
             video_title: selectedVideo.title,
-            reason: isSuspending ? "Policy violation" : "Review completed"
+            reason: isSuspending ? "Policy violation" : "Review completed",
+            duration: isSuspending ? suspensionDuration : null,
+            suspension_end_date: isSuspending ? calculateSuspensionEndDate(suspensionDuration) : null
           }
         });
       
@@ -160,8 +210,8 @@ const VideoManagement = () => {
       
       toast.success(
         isSuspending 
-          ? "Video has been suspended" 
-          : "Video has been restored"
+          ? `Video "${selectedVideo.title}" has been suspended ${suspensionDuration === '3days' ? 'for 3 days' : 'indefinitely'}`
+          : `Video "${selectedVideo.title}" has been restored`
       );
       
       refetch();
@@ -186,7 +236,7 @@ const VideoManagement = () => {
           title: editTitle,
           description: editDescription,
           category: editCategory,
-          updated_at: new Date().toISOString() // Add this line to update the timestamp
+          updated_at: new Date().toISOString()
         })
         .eq('id', selectedVideo.id);
       
@@ -227,6 +277,28 @@ const VideoManagement = () => {
     }
   };
   
+  // Handle video deletion
+  const handleDeleteVideo = async () => {
+    if (!selectedVideo) return;
+    
+    try {
+      const { success, error } = await deleteVideo(selectedVideo.id);
+      
+      if (!success || error) {
+        throw error || new Error("Failed to delete video");
+      }
+      
+      toast.success(`Video "${selectedVideo.title}" has been permanently deleted`);
+      refetch();
+    } catch (error) {
+      console.error("Error deleting video:", error);
+      toast.error("Failed to delete video");
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSelectedVideo(null);
+    }
+  };
+  
   // Open edit dialog and set form values
   const openEditDialog = (video: Video) => {
     setSelectedVideo(video);
@@ -239,7 +311,14 @@ const VideoManagement = () => {
   // Open suspend/restore dialog
   const openSuspendDialog = (video: Video) => {
     setSelectedVideo(video);
+    setSuspensionDuration('permanent');
     setIsSuspendDialogOpen(true);
+  };
+  
+  // Open delete confirmation dialog
+  const openDeleteDialog = (video: Video) => {
+    setSelectedVideo(video);
+    setIsDeleteDialogOpen(true);
   };
   
   // Format date for display
@@ -327,6 +406,9 @@ const VideoManagement = () => {
                     {video.is_suspended ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         Suspended
+                        {video.suspension_end_date && (
+                          <span className="ml-1">until {formatDate(video.suspension_end_date)}</span>
+                        )}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -356,6 +438,15 @@ const VideoManagement = () => {
                         ) : (
                           <AlertTriangle className="h-4 w-4" />
                         )}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => openDeleteDialog(video)}
+                        title="Delete video"
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -442,7 +533,7 @@ const VideoManagement = () => {
       
       {/* Suspend/Restore Video Dialog */}
       <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle>
               {selectedVideo?.is_suspended ? "Restore Video" : "Suspend Video"}
@@ -461,6 +552,26 @@ const VideoManagement = () => {
               <p className="text-sm text-gray-500 mt-1">
                 By: {selectedVideo.user?.username || "Unknown creator"}
               </p>
+              
+              {!selectedVideo.is_suspended && (
+                <div className="mt-4 space-y-3">
+                  <Label>Suspension Duration</Label>
+                  <RadioGroup 
+                    value={suspensionDuration} 
+                    onValueChange={(value) => setSuspensionDuration(value as SuspensionDuration)}
+                    className="flex flex-col space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="3days" id="video-duration-3days" />
+                      <Label htmlFor="video-duration-3days" className="cursor-pointer">Suspend for 3 days</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="permanent" id="video-duration-permanent" />
+                      <Label htmlFor="video-duration-permanent" className="cursor-pointer">Suspend indefinitely</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
             </div>
           )}
           
@@ -477,6 +588,30 @@ const VideoManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Delete Video Confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently Delete Video</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the video
+              and all associated data including comments, likes, and view history.
+              {selectedVideo && (
+                <div className="mt-2 font-medium">
+                  Video Title: {selectedVideo.title}
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteVideo} className="bg-red-600 hover:bg-red-700">
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 };
