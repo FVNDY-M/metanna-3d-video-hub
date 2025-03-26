@@ -22,6 +22,7 @@ export interface VideoData {
   visibility?: 'public' | 'private';
   category?: string;
   description?: string;
+  isSuspended?: boolean;
 }
 
 interface VideoCardProps {

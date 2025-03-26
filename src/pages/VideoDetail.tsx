@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -87,6 +88,56 @@ const VideoDetail = () => {
     const fetchVideo = async () => {
       setLoading(true);
       try {
+        // First try to fetch the real video from database
+        if (id) {
+          const { data: videoData, error } = await supabase
+            .from('videos')
+            .select(`
+              id, title, description, category, views, 
+              likes_count, comments_count, created_at, updated_at, 
+              user_id, video_url, thumbnail_url, visibility, is_suspended
+            `)
+            .eq('id', id)
+            .single();
+            
+          if (!error && videoData) {
+            // Get creator info
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url, subscriber_count')
+              .eq('id', videoData.user_id)
+              .single();
+              
+            const formattedVideo = {
+              id: videoData.id,
+              title: videoData.title,
+              thumbnail: videoData.thumbnail_url,
+              description: videoData.description,
+              category: videoData.category,
+              creator: {
+                id: creatorData?.id,
+                username: creatorData?.username || 'Unknown Creator',
+                avatar: creatorData?.avatar_url,
+                subscribers: creatorData?.subscriber_count || 0
+              },
+              likes: videoData.likes_count || 0,
+              comments: videoData.comments_count || 0,
+              immersions: videoData.views || 0,
+              createdAt: videoData.created_at,
+              visibility: videoData.visibility,
+              isSuspended: videoData.is_suspended
+            };
+              
+            setVideo(formattedVideo);
+            setLikeCount(formattedVideo.likes);
+            
+            fetchComments(id);
+            setLoading(false);
+            return;
+          }
+        }
+          
+        // Fallback to mock data if real video not found
         setTimeout(() => {
           const foundVideo = mockVideos.find(v => v.id === id);
           
