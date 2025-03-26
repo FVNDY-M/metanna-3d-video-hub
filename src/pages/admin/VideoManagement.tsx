@@ -179,8 +179,15 @@ const VideoManagement = () => {
     if (!selectedVideo) return;
     
     try {
+      console.log("Admin editing video with data:", {
+        title: editTitle,
+        description: editDescription,
+        category: editCategory,
+        updated_at: new Date().toISOString()
+      });
+      
       // Update video details
-      const { error: updateError } = await supabase
+      const { data: updateData, error: updateError } = await supabase
         .from('videos')
         .update({
           title: editTitle,
@@ -188,9 +195,15 @@ const VideoManagement = () => {
           category: editCategory,
           updated_at: new Date().toISOString() // Add this line to update the timestamp
         })
-        .eq('id', selectedVideo.id);
+        .eq('id', selectedVideo.id)
+        .select(); // Add select to return the updated data
+        
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw updateError;
+      }
       
-      if (updateError) throw updateError;
+      console.log("Video updated successfully:", updateData);
       
       // Log the moderation action
       const { error: logError } = await supabase
@@ -214,10 +227,13 @@ const VideoManagement = () => {
           }
         });
       
-      if (logError) throw logError;
+      if (logError) {
+        console.error("Log error:", logError);
+        throw logError;
+      }
       
       toast.success("Video details updated successfully");
-      refetch(); // Make sure to refetch to update the UI with the new data
+      await refetch(); // Make sure to refetch to update the UI with the new data
     } catch (error) {
       console.error("Error updating video:", error);
       toast.error("Failed to update video details");
