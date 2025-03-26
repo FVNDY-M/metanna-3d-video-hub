@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Heart, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,6 +21,7 @@ export interface VideoData {
   visibility?: 'public' | 'private';
   category?: string;
   description?: string;
+  isSuspended?: boolean;
 }
 
 interface VideoCardProps {

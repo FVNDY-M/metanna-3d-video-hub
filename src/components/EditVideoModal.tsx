@@ -474,7 +474,14 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
                       <Button 
                         variant="outline" 
                         className="mt-2 border-amber-500 text-amber-700 hover:bg-amber-100"
-                        onClick={() => updateData.is_suspended = false}
+                        onClick={() => {
+                          const updateData: any = {};
+                          updateData.is_suspended = false;
+                          supabase
+                            .from('videos')
+                            .update(updateData)
+                            .eq('id', videoId);
+                        }}
                       >
                         Restore Video
                       </Button>
@@ -592,4 +599,3 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
 };
 
 export default EditVideoModal;
-
