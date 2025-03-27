@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Dialog, 
@@ -22,12 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -102,7 +95,9 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             user_id,
             views,
             likes_count,
-            comments_count
+            comments_count,
+            is_suspended,
+            suspension_end_date
           `)
           .eq('id', videoId)
           .single();
@@ -133,6 +128,8 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             comments: videoData.comments_count || 0,
             immersions: videoData.views || 0,
             createdAt: videoData.created_at,
+            isSuspended: videoData.is_suspended,
+            suspensionEndDate: videoData.suspension_end_date
           });
 
           setViewCounted(false);
@@ -502,6 +499,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
   };
   
   const isOwnVideo = video && currentUser && video.creator.id === currentUser.id;
+  const isAdmin = false;
 
   if (!isOpen) return null;
 
@@ -515,6 +513,20 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             </div>
           ) : video ? (
             <div className="flex flex-col max-h-[90vh]">
+              {/* Suspension Warning Banner */}
+              {video.isSuspended && (isOwnVideo || isAdmin) && (
+                <div className="bg-red-600 text-white p-3 text-center">
+                  <div className="flex justify-center items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span>
+                      This video has been suspended {video.suspensionEndDate ? 
+                        `until ${formatDate(video.suspensionEndDate)}` : 
+                        'permanently'} for violating community guidelines.
+                    </span>
+                  </div>
+                </div>
+              )}
+            
               {/* Video Player Section */}
               <div className="relative w-full aspect-video bg-black">
                 {isPlaying ? (
@@ -550,7 +562,14 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                 <div className="p-4">
                   {/* Title and Actions */}
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xl font-bold">{video.title}</h2>
+                    <h2 className="text-xl font-bold">
+                      {video.title}
+                      {video.isSuspended && (isOwnVideo || isAdmin) && (
+                        <span className="ml-2 text-sm text-red-600 font-normal">
+                          (Suspended)
+                        </span>
+                      )}
+                    </h2>
                     
                     {isOwnVideo && (
                       <Button 

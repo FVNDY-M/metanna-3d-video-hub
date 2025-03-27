@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import PageLayout from '@/components/PageLayout';
 import VideoCard, { VideoData } from '@/components/VideoCard';
@@ -26,7 +25,6 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
   const [activeTab, setActiveTab] = useState(filter);
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
   
-  // Pagination states
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -60,9 +58,11 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           views,
           likes_count,
           comments_count,
-          category
+          category,
+          is_suspended
         `, { count: 'exact' })
         .eq('visibility', 'public')
+        .eq('is_suspended', false)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -94,6 +94,7 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
               comments: video.comments_count || 0,
               immersions: video.views || 0,
               createdAt: video.created_at,
+              isSuspended: video.is_suspended
             };
           })
         );
@@ -104,7 +105,6 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           setVideos(videosWithCreators);
         }
         
-        // Check if there are more videos to load
         setHasMore(count !== null && from + videosData.length < count);
       }
       
@@ -136,9 +136,11 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           views,
           likes_count,
           comments_count,
-          category
+          category,
+          is_suspended
         `, { count: 'exact' })
         .eq('visibility', 'public')
+        .eq('is_suspended', false)
         .order('views', { ascending: false })
         .range(from, to);
 
@@ -170,6 +172,7 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
               comments: video.comments_count || 0,
               immersions: video.views || 0,
               createdAt: video.created_at,
+              isSuspended: video.is_suspended
             };
           })
         );
@@ -180,7 +183,6 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           setTrendingVideos(videosWithCreators);
         }
         
-        // Check if there are more videos to load
         setTrendingHasMore(count !== null && from + videosData.length < count);
       }
       
@@ -233,10 +235,12 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           views,
           likes_count,
           comments_count,
-          category
+          category,
+          is_suspended
         `, { count: 'exact' })
         .in('user_id', creatorIds)
         .eq('visibility', 'public')
+        .eq('is_suspended', false)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -266,6 +270,7 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
               comments: video.comments_count || 0,
               immersions: video.views || 0,
               createdAt: video.created_at,
+              isSuspended: video.is_suspended
             };
           })
         );
@@ -276,7 +281,6 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           setSubscriptionVideos(videosWithCreators);
         }
         
-        // Check if there are more videos to load
         setSubscriptionHasMore(count !== null && from + videosData.length < count);
       }
       
@@ -348,46 +352,6 @@ const Index: React.FC<IndexProps> = ({ filter = 'explore' }) => {
           </TabsHeader>
           
           <TabsContent value="home">
-            {/* {currentUser ? (
-              subscriptionsLoading ? (
-                <div className="flex justify-center items-center py-20">
-                  <div className="loader"></div>
-                </div>
-              ) : subscriptionVideos.length > 0 ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                    {subscriptionVideos.map((video) => (
-                      <VideoCard key={video.id} video={video} />
-                    ))}
-                  </div>
-                  
-                  {subscriptionHasMore && (
-                    <div className="flex justify-center mt-8">
-                      <Button 
-                        onClick={loadMoreSubscriptionVideos} 
-                        disabled={subscriptionLoadingMore}
-                        className="gap-2"
-                      >
-                        {subscriptionLoadingMore && <Loader className="h-4 w-4 animate-spin" />}
-                        Load More Videos
-                      </Button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <EmptyState 
-                  title="No subscription videos found" 
-                  description="Videos from channels you subscribe to will appear here. Start by subscribing to some channels." 
-                  icon="🎬" 
-                />
-              )
-            ) : (
-              <EmptyState 
-                title="Sign in to see personalized content" 
-                description="Log in to see videos from channels you subscribe to." 
-                icon="🔒" 
-              />
-            )} */}
             {loading ? (
               <div className="flex justify-center items-center py-20">
                 <div className="loader"></div>

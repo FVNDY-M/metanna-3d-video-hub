@@ -333,6 +333,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       lift_expired_suspensions: {
         Args: Record<PropertyKey, never>
         Returns: undefined

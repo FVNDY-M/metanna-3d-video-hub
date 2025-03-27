@@ -72,7 +72,9 @@ const YourVideos = () => {
           comments: video.comments_count,
           immersions: video.views,
           createdAt: video.created_at,
-          visibility: video.visibility
+          visibility: video.visibility,
+          isSuspended: video.is_suspended,
+          suspensionEndDate: video.suspension_end_date
         })) as VideoData[];
         
         setVideos(processedVideos);
@@ -148,7 +150,7 @@ const YourVideos = () => {
                 <div key={video.id} className="flex flex-col">
                   <div className="relative">
                     <div onClick={() => handleVideoClick(video.id)}>
-                      <VideoCard video={video} />
+                      <VideoCard video={video} isOwner={true} />
                     </div>
                     <div className="absolute top-2 right-2 flex gap-2">
                       <Badge className={`${
@@ -156,6 +158,11 @@ const YourVideos = () => {
                       }`}>
                         {video.visibility === 'public' ? 'Public' : 'Private'}
                       </Badge>
+                      {video.isSuspended && (
+                        <Badge variant="destructive">
+                          Suspended
+                        </Badge>
+                      )}
                       {video.category && (
                         <Badge variant="outline" className="bg-white">
                           {video.category}
