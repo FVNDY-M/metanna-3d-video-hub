@@ -121,7 +121,7 @@ const VideoManagement = () => {
           views,
           likes_count,
           is_suspended,
-          profiles:user_id (username)
+          profiles(username)
         `)
         .order(sortField, { ascending: sortDirection === 'asc' });
 
@@ -156,7 +156,7 @@ const VideoManagement = () => {
         category: video.category,
         visibility: video.visibility as 'public' | 'private',
         creator: {
-          username: video.profiles?.username || 'Unknown',
+          username: video.profiles?.[0]?.username || 'Unknown',
           id: video.user_id
         },
         created_at: video.created_at,
