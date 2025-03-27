@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Eye, Edit, AlertTriangle, CheckCircle, Search, X, Trash2 } from 'lucide-react';
@@ -40,6 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import EditVideoModal from '@/components/EditVideoModal';
 
 // Define interfaces for our data
 interface UserProfile {
@@ -74,14 +74,15 @@ const VideoManagement = () => {
   
   // States for modals
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Edit form states
-  const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editCategory, setEditCategory] = useState('');
+  // Edit form states - we no longer need these as EditVideoModal handles this
+  // Remove the following lines:
+  // const [editTitle, setEditTitle] = useState('');
+  // const [editDescription, setEditDescription] = useState('');
+  // const [editCategory, setEditCategory] = useState('');
   
   // Suspension duration state
   const [suspensionDuration, setSuspensionDuration] = useState('permanent');
@@ -209,73 +210,10 @@ const VideoManagement = () => {
     }
   };
   
-  // Handle video edit
-  const handleEditVideo = async () => {
-    if (!selectedVideo) return;
-    
-    try {
-      console.log("Admin editing video with data:", {
-        title: editTitle,
-        description: editDescription,
-        category: editCategory,
-        updated_at: new Date().toISOString()
-      });
-      
-      // Update video details
-      const { data: updateData, error: updateError } = await supabase
-        .from('videos')
-        .update({
-          title: editTitle,
-          description: editDescription,
-          category: editCategory,
-          updated_at: new Date().toISOString() // Add this line to update the timestamp
-        })
-        .eq('id', selectedVideo.id)
-        .select(); // Add select to return the updated data
-        
-      if (updateError) {
-        console.error("Update error:", updateError);
-        throw updateError;
-      }
-      
-      console.log("Video updated successfully:", updateData);
-      
-      // Log the moderation action
-      const { error: logError } = await supabase
-        .from('moderation_actions')
-        .insert({
-          admin_id: (await supabase.auth.getSession()).data.session?.user.id,
-          action_type: 'video_edit',
-          target_type: 'video',
-          target_id: selectedVideo.id,
-          details: { 
-            previous_title: selectedVideo.title,
-            new_title: editTitle,
-            updated_fields: ['title', 'description', 'category'].filter(field => {
-              switch (field) {
-                case 'title': return editTitle !== selectedVideo.title;
-                case 'description': return editDescription !== selectedVideo.description;
-                case 'category': return editCategory !== selectedVideo.category;
-                default: return false;
-              }
-            })
-          }
-        });
-      
-      if (logError) {
-        console.error("Log error:", logError);
-        throw logError;
-      }
-      
-      toast.success("Video details updated successfully");
-      await refetch(); // Make sure to refetch to update the UI with the new data
-    } catch (error) {
-      console.error("Error updating video:", error);
-      toast.error("Failed to update video details");
-    } finally {
-      setIsEditDialogOpen(false);
-      setSelectedVideo(null);
-    }
+  // Handle video edit is now handled by EditVideoModal
+  const handleVideoUpdated = async () => {
+    await refetch();
+    toast.success("Video details updated successfully");
   };
   
   // Handle video deletion
@@ -318,10 +256,7 @@ const VideoManagement = () => {
   // Open edit dialog and set form values
   const openEditDialog = (video: Video) => {
     setSelectedVideo(video);
-    setEditTitle(video.title);
-    setEditDescription(video.description || '');
-    setEditCategory(video.category || 'Uncategorized');
-    setIsEditDialogOpen(true);
+    setIsEditModalOpen(true);
   };
   
   // Open suspend/restore dialog
@@ -480,69 +415,14 @@ const VideoManagement = () => {
         </div>
       )}
       
-      {/* Edit Video Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>Edit Video</DialogTitle>
-            <DialogDescription>
-              Update the video details. These changes will be visible to all users.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Title</label>
-              <Input 
-                value={editTitle} 
-                onChange={(e) => setEditTitle(e.target.value)}
-                maxLength={100}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Textarea 
-                value={editDescription} 
-                onChange={(e) => setEditDescription(e.target.value)}
-                rows={4}
-                maxLength={500}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select value={editCategory} onValueChange={setEditCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Uncategorized">Uncategorized</SelectItem>
-                  <SelectItem value="Entertainment">Entertainment</SelectItem>
-                  <SelectItem value="Education">Education</SelectItem>
-                  <SelectItem value="Science">Science</SelectItem>
-                  <SelectItem value="Tech">Tech</SelectItem>
-                  <SelectItem value="Arts">Arts</SelectItem>
-                  <SelectItem value="Sports">Sports</SelectItem>
-                  <SelectItem value="Travel">Travel</SelectItem>
-                  <SelectItem value="Gaming">Gaming</SelectItem>
-                  <SelectItem value="Music">Music</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditVideo} disabled={!editTitle.trim()}>
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* EditVideoModal - New implementation */}
+      <EditVideoModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        videoId={selectedVideo?.id || null}
+        onVideoUpdated={handleVideoUpdated}
+        onVideoDeleted={handleDeleteVideo}
+      />
       
       {/* Suspend/Restore Video Dialog */}
       <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
