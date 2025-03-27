@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Eye, Edit, AlertTriangle, CheckCircle, Search, X, Trash2 } from 'lucide-react';
@@ -26,7 +27,6 @@ import {
   RadioGroup,
   RadioGroupItem 
 } from '@/components/ui/radio-group';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/AdminLayout';
 import { 
@@ -77,12 +77,6 @@ const VideoManagement = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  
-  // Edit form states - we no longer need these as EditVideoModal handles this
-  // Remove the following lines:
-  // const [editTitle, setEditTitle] = useState('');
-  // const [editDescription, setEditDescription] = useState('');
-  // const [editCategory, setEditCategory] = useState('');
   
   // Suspension duration state
   const [suspensionDuration, setSuspensionDuration] = useState('permanent');
@@ -210,17 +204,19 @@ const VideoManagement = () => {
     }
   };
   
-  // Handle video edit is now handled by EditVideoModal
+  // Handle video updated callback from EditVideoModal
   const handleVideoUpdated = async () => {
     await refetch();
     toast.success("Video details updated successfully");
   };
   
   // Handle video deletion
-  const handleDeleteVideo = async () => {
-    if (!selectedVideo) return;
-    
+  const handleDeleteVideo = async (videoId: string) => {
     try {
+      if (!selectedVideo && !videoId) return;
+      
+      const videoToDelete = selectedVideo?.id || videoId;
+      
       // Log the moderation action first in case deletion succeeds
       const { error: logError } = await supabase
         .from('moderation_actions')
@@ -228,28 +224,39 @@ const VideoManagement = () => {
           admin_id: (await supabase.auth.getSession()).data.session?.user.id,
           action_type: 'video_delete',
           target_type: 'video',
-          target_id: selectedVideo.id,
+          target_id: videoToDelete,
           details: { 
-            video_title: selectedVideo.title,
-            creator: selectedVideo.user?.username || "Unknown"
+            video_title: selectedVideo?.title || "Unknown video title",
+            creator: selectedVideo?.user?.username || "Unknown"
           }
         });
         
       if (logError) throw logError;
       
       // Delete the video and all related data
-      const { success, error } = await deleteVideo(selectedVideo.id);
+      const { success, error } = await deleteVideo(videoToDelete);
       
       if (!success) throw error;
       
       toast.success("Video has been permanently deleted");
-      refetch();
+      await refetch();
+      
+      // Reset state
+      if (isDeleteDialogOpen) {
+        setIsDeleteDialogOpen(false);
+      }
+      
+      if (isEditModalOpen) {
+        setIsEditModalOpen(false);
+      }
+      
+      setSelectedVideo(null);
+      
+      return { success: true };
     } catch (error) {
       console.error("Error deleting video:", error);
       toast.error("Failed to delete video");
-    } finally {
-      setIsDeleteDialogOpen(false);
-      setSelectedVideo(null);
+      return { success: false, error };
     }
   };
   
@@ -415,7 +422,7 @@ const VideoManagement = () => {
         </div>
       )}
       
-      {/* EditVideoModal - New implementation */}
+      {/* EditVideoModal */}
       <EditVideoModal 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -503,7 +510,7 @@ const VideoManagement = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleDeleteVideo}
+              onClick={() => handleDeleteVideo(selectedVideo?.id || '')}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Permanently
