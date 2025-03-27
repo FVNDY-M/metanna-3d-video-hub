@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
@@ -22,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
 import { CropIcon, Upload, Trash2 } from 'lucide-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 
 interface EditVideoModalProps {
@@ -343,9 +345,10 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     if (!videoId || !onVideoDeleted) return;
     try {
       await onVideoDeleted(videoId);
-      setIsDeleteDialogOpen(false);
     } catch (error) {
       console.error('Error in delete confirmation handler:', error);
+    } finally {
+      setIsDeleteDialogOpen(false);
     }
   };
 
