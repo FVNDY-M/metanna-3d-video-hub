@@ -18,10 +18,18 @@ const YourVideos = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchUserVideos = async () => {
+    fetchUserVideos();
+  }, []);
+
+  const fetchUserVideos = async () => {
+    setLoading(true);
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session) return;
+      if (!session) {
+        setLoading(false);
+        return;
+      }
       
       // Get user profile information
       const { data: profileData } = await supabase
@@ -69,12 +77,13 @@ const YourVideos = () => {
         
         setVideos(processedVideos);
       }
-      
+    } catch (error) {
+      console.error('Error in fetchUserVideos:', error);
+      toast.error('Failed to load your videos');
+    } finally {
       setLoading(false);
-    };
-
-    fetchUserVideos();
-  }, []);
+    }
+  };
 
   const handleVideoClick = (videoId: string) => {
     setEditingVideoId(videoId);
@@ -89,6 +98,7 @@ const YourVideos = () => {
   const handleVideoUpdated = () => {
     // Refetch videos after an update
     fetchUserVideos();
+    toast.success("Video updated successfully");
   };
   
   const handleVideoDeleted = async (videoId: string) => {
@@ -108,65 +118,6 @@ const YourVideos = () => {
       console.error("Error during video deletion:", error);
       toast.error("An unexpected error occurred while deleting the video");
     }
-  };
-  
-  const fetchUserVideos = async () => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      setLoading(false);
-      return;
-    }
-    
-    // Get user profile information
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
-      
-    if (profileData) {
-      setUserProfile(profileData);
-    }
-    
-    // Fetch all videos created by the user
-    const { data: videosData, error } = await supabase
-      .from('videos')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching videos:', error);
-      setLoading(false);
-      return;
-    }
-
-    if (videosData) {
-      const processedVideos = videosData.map(video => ({
-        id: video.id,
-        title: video.title,
-        thumbnail: video.thumbnail_url || '',
-        category: video.category,
-        description: video.description,
-        creator: {
-          id: video.user_id,
-          username: profileData?.username || 'Unknown Creator',
-          avatar: profileData?.avatar_url || undefined,
-          subscribers: profileData?.subscriber_count || 0
-        },
-        likes: video.likes_count,
-        comments: video.comments_count,
-        immersions: video.views,
-        createdAt: video.created_at,
-        visibility: video.visibility
-      })) as VideoData[];
-      
-      setVideos(processedVideos);
-    }
-    
-    setLoading(false);
   };
 
   return (
