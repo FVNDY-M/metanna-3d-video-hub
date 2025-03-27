@@ -1,39 +1,34 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Eye, Edit, AlertTriangle, CheckCircle, Search, X, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import AdminLayout from '@/components/AdminLayout';
+import { deleteVideo } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { 
-  Table, 
-  TableHeader, 
-  TableRow, 
-  TableHead, 
-  TableBody, 
-  TableCell 
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from '@/components/ui/dialog';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
 } from '@/components/ui/select';
-import { Checkbox } from "@/components/ui/checkbox";
-import EditVideoModal from '@/components/EditVideoModal';
 import { 
-  Check, 
-  X, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Eye,
-  AlertCircle,
-  SlidersHorizontal,
-  ArrowUpDown,
-  RefreshCw
-} from 'lucide-react';
+  RadioGroup,
+  RadioGroupItem 
+} from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import AdminLayout from '@/components/AdminLayout';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -43,692 +38,475 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { 
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Badge } from '@/components/ui/badge';
-import { VideoData } from '@/components/VideoCard';
+} from '@/components/ui/alert-dialog';
+import EditVideoModal from '@/components/EditVideoModal';
+
+// Define interfaces for our data
+interface UserProfile {
+  id: string;
+  username: string;
+  avatar_url?: string;
+}
 
 interface Video {
   id: string;
   title: string;
+  description: string | null;
   category: string;
-  visibility: 'public' | 'private';
-  creator: {
-    username: string;
-    id: string;
-  };
-  created_at: string;
   views: number;
   likes_count: number;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  visibility: string;
   is_suspended: boolean;
-  thumbnail: string;
+  suspension_end_date: string | null;
+  user?: UserProfile;
 }
 
 const VideoManagement = () => {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // States for filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState('');
-  const [suspendedFilter, setSuspendedFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<VideoData | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [processingBulkAction, setProcessingBulkAction] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   
-  const videoCategories = [
-    'Gaming',
-    'Music',
-    'Sports',
-    'Technology',
-    'Travel',
-    'Cooking',
-    'Education',
-    'Fashion',
-    'Art',
-    'Fitness',
-    'Science',
-    'Entertainment',
-    'Uncategorized'
-  ];
-
-  useEffect(() => {
-    fetchVideos();
-  }, [sortField, sortDirection]);
-
-  const fetchVideos = async () => {
-    setIsLoading(true);
-    try {
+  // States for modals
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  // Edit form states - we no longer need these as EditVideoModal handles this
+  // Remove the following lines:
+  // const [editTitle, setEditTitle] = useState('');
+  // const [editDescription, setEditDescription] = useState('');
+  // const [editCategory, setEditCategory] = useState('');
+  
+  // Suspension duration state
+  const [suspensionDuration, setSuspensionDuration] = useState('permanent');
+  
+  // Fetch videos with creator info
+  const { data: videos, isLoading, refetch } = useQuery({
+    queryKey: ['admin-videos', statusFilter],
+    queryFn: async () => {
+      // First, fetch videos
       let query = supabase
         .from('videos')
-        .select(`
-          id,
-          title,
-          category,
-          thumbnail_url,
-          visibility,
-          user_id,
-          created_at,
-          views,
-          likes_count,
-          is_suspended,
-          profiles(username)
-        `)
-        .order(sortField, { ascending: sortDirection === 'asc' });
-
-      // Apply filters if they exist
-      if (searchQuery) {
-        query = query.ilike('title', `%${searchQuery}%`);
-      }
+        .select('*')
+        .order('created_at', { ascending: false });
       
-      if (selectedCategory) {
-        query = query.eq('category', selectedCategory);
-      }
-      
-      if (visibilityFilter) {
-        query = query.eq('visibility', visibilityFilter);
-      }
-      
-      if (suspendedFilter === 'suspended') {
+      // Apply status filter
+      if (statusFilter === 'suspended') {
         query = query.eq('is_suspended', true);
-      } else if (suspendedFilter === 'active') {
+      } else if (statusFilter === 'active') {
         query = query.eq('is_suspended', false);
       }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw error;
-      }
-
-      const formattedVideos = data.map(video => ({
-        id: video.id,
-        title: video.title,
-        category: video.category,
-        visibility: video.visibility as 'public' | 'private',
-        creator: {
-          username: video.profiles?.[0]?.username || 'Unknown',
-          id: video.user_id
-        },
-        created_at: video.created_at,
-        views: video.views,
-        likes_count: video.likes_count,
-        is_suspended: video.is_suspended,
-        thumbnail: video.thumbnail_url
-      }));
-
-      setVideos(formattedVideos);
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-      toast.error('Failed to load videos');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSort = (field: string) => {
-    if (field === sortField) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
-  };
-
-  const handleRowSelection = (videoId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedRows([...selectedRows, videoId]);
-    } else {
-      setSelectedRows(selectedRows.filter(id => id !== videoId));
-    }
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedRows(videos.map(video => video.id));
-    } else {
-      setSelectedRows([]);
-    }
-  };
-
-  const handleEdit = (video: Video) => {
-    const videoData: VideoData = {
-      id: video.id,
-      title: video.title,
-      category: video.category,
-      visibility: video.visibility,
-      thumbnail: video.thumbnail,
-      videoUrl: '', // This will be filled by the EditVideoModal component
-      creator: {
-        id: video.creator.id,
-        username: video.creator.username,
-        avatar: '', // This will be filled by the EditVideoModal component
-        subscribers: 0 // This will be filled by the EditVideoModal component
-      },
-      likes: video.likes_count,
-      comments: 0, // This will be filled by the EditVideoModal component
-      immersions: video.views,
-      createdAt: video.created_at,
-      description: '' // This will be filled by the EditVideoModal component
-    };
-    
-    setSelectedVideo(videoData);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeleteVideo = async (videoId: string) => {
-    try {
-      const { error } = await supabase
-        .from('videos')
-        .delete()
-        .eq('id', videoId);
-
-      if (error) throw error;
       
-      toast.success('Video deleted successfully');
-      setVideos(videos.filter(video => video.id !== videoId));
-      setSelectedRows(selectedRows.filter(id => id !== videoId));
+      const { data: videoData, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching videos:", error);
+        throw new Error("Failed to fetch videos");
+      }
+      
+      if (!videoData || videoData.length === 0) {
+        return [] as Video[];
+      }
+      
+      // Then, fetch user profiles separately
+      const userIds = [...new Set(videoData.map(video => video.user_id))];
+      
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+        
+      if (profilesError) {
+        console.error("Error fetching user profiles:", profilesError);
+        // Return videos without user info if there's an error
+        return videoData as Video[];
+      }
+      
+      // Combine videos with user info
+      return videoData.map(video => ({
+        ...video,
+        user: userProfiles.find(profile => profile.id === video.user_id) || { id: video.user_id, username: 'Unknown' }
+      })) as Video[];
+    }
+  });
+  
+  // Filtered videos based on search query
+  const filteredVideos = React.useMemo(() => {
+    if (!videos) return [];
+    
+    return videos.filter(video => 
+      video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (video.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (video.user?.username || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [videos, searchQuery]);
+  
+  // Handle video suspension/restoration
+  const handleToggleSuspension = async () => {
+    if (!selectedVideo) return;
+    
+    const isSuspending = !selectedVideo.is_suspended;
+    
+    try {
+      let suspensionEndDate = null;
+      
+      // If suspending and duration is 3 days, calculate end date
+      if (isSuspending && suspensionDuration === '3days') {
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 3);
+        suspensionEndDate = endDate.toISOString();
+      }
+      
+      // Update video status
+      const { error: updateError } = await supabase
+        .from('videos')
+        .update({ 
+          is_suspended: isSuspending,
+          suspension_end_date: suspensionEndDate
+        })
+        .eq('id', selectedVideo.id);
+      
+      if (updateError) throw updateError;
+      
+      // Log the moderation action
+      const { error: logError } = await supabase
+        .from('moderation_actions')
+        .insert({
+          admin_id: (await supabase.auth.getSession()).data.session?.user.id,
+          action_type: isSuspending ? 'video_suspend' : 'video_restore',
+          target_type: 'video',
+          target_id: selectedVideo.id,
+          details: { 
+            video_title: selectedVideo.title,
+            reason: isSuspending ? "Policy violation" : "Review completed",
+            duration: isSuspending ? suspensionDuration : null,
+            suspension_end_date: suspensionEndDate
+          }
+        });
+      
+      if (logError) throw logError;
+      
+      toast.success(
+        isSuspending 
+          ? `Video has been suspended${suspensionDuration === '3days' ? ' for 3 days' : ' permanently'}` 
+          : "Video has been restored"
+      );
+      
+      refetch();
     } catch (error) {
-      console.error('Error deleting video:', error);
-      toast.error('Failed to delete video');
+      console.error("Error toggling video suspension:", error);
+      toast.error("Failed to update video status");
+    } finally {
+      setIsSuspendDialogOpen(false);
+      setSelectedVideo(null);
+      setSuspensionDuration('permanent');
     }
   };
-
-  const handleDeleteClick = (video: Video) => {
-    setSelectedVideo({
-      id: video.id,
-      title: video.title,
-      category: video.category,
-      visibility: video.visibility,
-      thumbnail: video.thumbnail,
-      videoUrl: '', 
-      creator: {
-        id: video.creator.id,
-        username: video.creator.username,
-        avatar: '', 
-        subscribers: 0 
-      },
-      likes: video.likes_count,
-      comments: 0, 
-      immersions: video.views,
-      createdAt: video.created_at,
-      description: '' 
-    });
-    setIsDeleteDialogOpen(true);
+  
+  // Handle video edit is now handled by EditVideoModal
+  const handleVideoUpdated = async () => {
+    await refetch();
+    toast.success("Video details updated successfully");
   };
-
-  const handleDeleteConfirm = async () => {
-    if (!selectedVideo || !selectedVideo.id) return;
+  
+  // Handle video deletion
+  const handleDeleteVideo = async () => {
+    if (!selectedVideo) return;
+    
     try {
-      await handleDeleteVideo(selectedVideo.id);
+      // Log the moderation action first in case deletion succeeds
+      const { error: logError } = await supabase
+        .from('moderation_actions')
+        .insert({
+          admin_id: (await supabase.auth.getSession()).data.session?.user.id,
+          action_type: 'video_delete',
+          target_type: 'video',
+          target_id: selectedVideo.id,
+          details: { 
+            video_title: selectedVideo.title,
+            creator: selectedVideo.user?.username || "Unknown"
+          }
+        });
+        
+      if (logError) throw logError;
+      
+      // Delete the video and all related data
+      const { success, error } = await deleteVideo(selectedVideo.id);
+      
+      if (!success) throw error;
+      
+      toast.success("Video has been permanently deleted");
+      refetch();
     } catch (error) {
-      console.error('Error in delete confirmation handler:', error);
+      console.error("Error deleting video:", error);
+      toast.error("Failed to delete video");
     } finally {
       setIsDeleteDialogOpen(false);
       setSelectedVideo(null);
     }
   };
-
-  const handleVideoUpdated = () => {
-    fetchVideos();
+  
+  // Open edit dialog and set form values
+  const openEditDialog = (video: Video) => {
+    setSelectedVideo(video);
+    setIsEditModalOpen(true);
   };
-
-  const handleBulkSuspend = async () => {
-    if (selectedRows.length === 0) return;
-    
-    setProcessingBulkAction(true);
-    try {
-      const { error } = await supabase
-        .from('videos')
-        .update({ 
-          is_suspended: true,
-          suspension_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-        })
-        .in('id', selectedRows);
-
-      if (error) throw error;
-      
-      await logModerationAction('suspend', 'video', selectedRows);
-      
-      toast.success(`${selectedRows.length} videos suspended for 7 days`);
-      fetchVideos();
-      setSelectedRows([]);
-    } catch (error) {
-      console.error('Error suspending videos:', error);
-      toast.error('Failed to suspend videos');
-    } finally {
-      setProcessingBulkAction(false);
-    }
+  
+  // Open suspend/restore dialog
+  const openSuspendDialog = (video: Video) => {
+    setSelectedVideo(video);
+    setSuspensionDuration('permanent');
+    setIsSuspendDialogOpen(true);
   };
-
-  const handleBulkUnsuspend = async () => {
-    if (selectedRows.length === 0) return;
-    
-    setProcessingBulkAction(true);
-    try {
-      const { error } = await supabase
-        .from('videos')
-        .update({ 
-          is_suspended: false,
-          suspension_end_date: null
-        })
-        .in('id', selectedRows);
-
-      if (error) throw error;
-      
-      await logModerationAction('unsuspend', 'video', selectedRows);
-      
-      toast.success(`${selectedRows.length} videos unsuspended`);
-      fetchVideos();
-      setSelectedRows([]);
-    } catch (error) {
-      console.error('Error unsuspending videos:', error);
-      toast.error('Failed to unsuspend videos');
-    } finally {
-      setProcessingBulkAction(false);
-    }
+  
+  // Open delete dialog
+  const openDeleteDialog = (video: Video) => {
+    setSelectedVideo(video);
+    setIsDeleteDialogOpen(true);
   };
-
-  const handleBulkDelete = async () => {
-    if (selectedRows.length === 0) return;
-    
-    setProcessingBulkAction(true);
-    try {
-      const { error } = await supabase
-        .from('videos')
-        .delete()
-        .in('id', selectedRows);
-
-      if (error) throw error;
-      
-      await logModerationAction('delete', 'video', selectedRows);
-      
-      toast.success(`${selectedRows.length} videos deleted`);
-      fetchVideos();
-      setSelectedRows([]);
-    } catch (error) {
-      console.error('Error deleting videos:', error);
-      toast.error('Failed to delete videos');
-    } finally {
-      setProcessingBulkAction(false);
-    }
+  
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    return new Intl.DateTimeFormat('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).format(new Date(dateString));
   };
-
-  const logModerationAction = async (actionType: string, targetType: string, targetIds: string[]) => {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) return;
-      
-      const adminId = sessionData.session.user.id;
-      
-      // Create a moderation action record for each target
-      const moderationActions = targetIds.map(targetId => ({
-        admin_id: adminId,
-        action_type: actionType,
-        target_type: targetType,
-        target_id: targetId,
-        details: {
-          reason: 'Bulk action from admin panel',
-          timestamp: new Date().toISOString()
-        }
-      }));
-      
-      const { error } = await supabase
-        .from('moderation_actions')
-        .insert(moderationActions);
-        
-      if (error) {
-        console.error('Error logging moderation action:', error);
-      }
-    } catch (error) {
-      console.error('Error in logModerationAction:', error);
-    }
-  };
-
+  
   return (
     <AdminLayout title="Video Management">
-      <div className="space-y-4">
-        {/* Search and filters bar */}
-        <div className="flex flex-wrap gap-3 items-end mb-6">
-          <div className="flex-1 min-w-48">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search videos..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchVideos()}
-              />
-            </div>
-          </div>
-          
-          <Button variant="outline" onClick={fetchVideos}>
-            <Search className="h-4 w-4 mr-2" />
-            Search
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={() => setShowFilters(!showFilters)}
-            className="bg-gray-50"
-          >
-            <SlidersHorizontal className="h-4 w-4 mr-2" />
-            Filters
-            {(selectedCategory || visibilityFilter || suspendedFilter) && (
-              <Badge variant="secondary" className="ml-2 px-1 py-0 h-5">
-                {[
-                  selectedCategory && '1',
-                  visibilityFilter && '1',
-                  suspendedFilter && '1'
-                ].filter(Boolean).length}
-              </Badge>
-            )}
-          </Button>
-          
-          <Button variant="outline" onClick={() => fetchVideos()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+      {/* Filters and Search */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search videos by title, description or creator..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         
-        {/* Collapsible filters section */}
-        <Collapsible open={showFilters} className="mb-6">
-          <CollapsibleContent>
-            <div className="p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Category</label>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All categories</SelectItem>
-                    {videoCategories.map((category) => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-1 block">Visibility</label>
-                <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All videos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All videos</SelectItem>
-                    <SelectItem value="public">Public</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-1 block">Status</label>
-                <Select value={suspendedFilter} onValueChange={setSuspendedFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All statuses</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="md:col-span-3 flex justify-end space-x-2 mt-2">
-                <Button variant="outline" onClick={() => {
-                  setSelectedCategory('');
-                  setVisibilityFilter('');
-                  setSuspendedFilter('');
-                }}>
-                  Reset Filters
-                </Button>
-                <Button onClick={() => fetchVideos()}>Apply Filters</Button>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        {/* Bulk actions */}
-        {selectedRows.length > 0 && (
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center justify-between mb-4">
-            <span className="text-sm text-blue-700">
-              {selectedRows.length} videos selected
-            </span>
-            <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="text-xs" 
-                onClick={() => setSelectedRows([])}
-              >
-                Deselect All
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="text-xs border-orange-200 text-orange-600 hover:bg-orange-50"
-                onClick={handleBulkSuspend}
-                disabled={processingBulkAction}
-              >
-                <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                Suspend
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="text-xs border-green-200 text-green-600 hover:bg-green-50"
-                onClick={handleBulkUnsuspend}
-                disabled={processingBulkAction}
-              >
-                <Check className="h-3.5 w-3.5 mr-1" />
-                Unsuspend
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="text-xs border-red-200 text-red-600 hover:bg-red-50"
-                    disabled={processingBulkAction}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />
-                    Delete
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      You are about to delete {selectedRows.length} videos. This action cannot be undone.
-                      All associated comments, likes, and watch history will also be deleted.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
-                      className="bg-red-500 hover:bg-red-600"
-                      onClick={handleBulkDelete}
-                    >
-                      Delete {selectedRows.length} videos
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </div>
-        )}
-        
-        {/* Videos table */}
-        <div className="rounded-md border">
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Videos</SelectItem>
+            <SelectItem value="active">Active Only</SelectItem>
+            <SelectItem value="suspended">Suspended Only</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {/* Videos Table */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin h-8 w-8 border-4 border-metanna-blue border-t-transparent rounded-full"></div>
+        </div>
+      ) : filteredVideos.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <h3 className="text-lg font-medium text-gray-600 mb-1">No videos found</h3>
+          <p className="text-gray-500 text-sm">Try adjusting your search or filter criteria</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox 
-                    checked={videos.length > 0 && selectedRows.length === videos.length}
-                    onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                  />
-                </TableHead>
-                <TableHead className="w-14">
-                  {/* Thumbnail column */}
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('title')}>
-                  <div className="flex items-center">
-                    Title
-                    {sortField === 'title' && (
-                      <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'rotate-180' : ''}`} />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead>Title</TableHead>
                 <TableHead>Creator</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
-                  <div className="flex items-center">
-                    Posted
-                    {sortField === 'created_at' && (
-                      <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'rotate-180' : ''}`} />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('views')}>
-                  <div className="flex items-center">
-                    Views
-                    {sortField === 'views' && (
-                      <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'rotate-180' : ''}`} />
-                    )}
-                  </div>
-                </TableHead>
+                <TableHead className="hidden md:table-cell">Date</TableHead>
+                <TableHead className="hidden md:table-cell">Views</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center">
-                    Loading videos...
+              {filteredVideos.map((video) => (
+                <TableRow key={video.id} className={video.is_suspended ? "bg-red-50" : ""}>
+                  <TableCell className="font-medium max-w-[200px] truncate">
+                    {video.title}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {video.user?.username || "Unknown"}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {formatDate(video.created_at)}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {video.views.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    {video.is_suspended ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        {video.suspension_end_date ? 'Temp Suspended' : 'Suspended'}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Active
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => openEditDialog(video)}
+                        title="Edit video"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant={video.is_suspended ? "outline" : "ghost"}
+                        size="sm" 
+                        onClick={() => openSuspendDialog(video)}
+                        title={video.is_suspended ? "Restore video" : "Suspend video"}
+                        className={video.is_suspended ? "text-green-600 hover:text-green-700" : "text-red-600 hover:text-red-700"}
+                      >
+                        {video.is_suspended ? (
+                          <CheckCircle className="h-4 w-4" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteDialog(video)}
+                        title="Delete video"
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        asChild
+                        title="View video"
+                      >
+                        <Link to={`/video/${video.id}`}>
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ) : videos.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center">
-                    No videos found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                videos.map((video) => (
-                  <TableRow key={video.id}>
-                    <TableCell>
-                      <Checkbox 
-                        checked={selectedRows.includes(video.id)}
-                        onCheckedChange={(checked) => handleRowSelection(video.id, checked as boolean)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {video.thumbnail ? (
-                        <img 
-                          src={video.thumbnail} 
-                          alt={video.title} 
-                          className="h-8 w-14 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="h-8 w-14 bg-gray-200 rounded" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-48 truncate font-medium">{video.title}</div>
-                    </TableCell>
-                    <TableCell>{video.category}</TableCell>
-                    <TableCell>
-                      <span className="max-w-32 truncate">{video.creator.username}</span>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(video.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{video.views.toLocaleString()}</TableCell>
-                    <TableCell>
-                      {video.is_suspended ? (
-                        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
-                          Suspended
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
-                          Active
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          className="h-7 w-7"
-                          onClick={() => handleEdit(video)}
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          className="h-7 w-7 border-red-200 text-red-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => handleDeleteClick(video)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </div>
-      </div>
-      
-      {/* Edit Video Modal */}
-      {selectedVideo && (
-        <EditVideoModal 
-          isOpen={isEditModalOpen}
-          onClose={() => {
-            setIsEditModalOpen(false);
-            setSelectedVideo(null);
-          }}
-          videoId={selectedVideo.id}
-          onVideoUpdated={handleVideoUpdated}
-          onVideoDeleted={handleDeleteVideo}
-        />
       )}
       
-      {/* Delete Confirmation Dialog */}
+      {/* EditVideoModal - New implementation */}
+      <EditVideoModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        videoId={selectedVideo?.id || null}
+        onVideoUpdated={handleVideoUpdated}
+        onVideoDeleted={handleDeleteVideo}
+      />
+      
+      {/* Suspend/Restore Video Dialog */}
+      <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedVideo?.is_suspended ? "Restore Video" : "Suspend Video"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedVideo?.is_suspended 
+                ? "This will make the video visible again to all users."
+                : "This will hide the video from all public views and searches."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedVideo && (
+            <div className="py-4">
+              <h4 className="font-medium">{selectedVideo.title}</h4>
+              <p className="text-sm text-gray-500 mt-1">
+                By: {selectedVideo.user?.username || "Unknown creator"}
+              </p>
+              
+              {!selectedVideo.is_suspended && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Suspension Duration</h4>
+                  <RadioGroup 
+                    value={suspensionDuration} 
+                    onValueChange={setSuspensionDuration}
+                    className="flex flex-col space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="3days" id="video_3days" />
+                      <label htmlFor="video_3days" className="text-sm font-medium">
+                        Suspend for 3 days
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="permanent" id="video_permanent" />
+                      <label htmlFor="video_permanent" className="text-sm font-medium">
+                        Suspend permanently
+                      </label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSuspendDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleToggleSuspension}
+              variant={selectedVideo?.is_suspended ? "default" : "destructive"}
+            >
+              {selectedVideo?.is_suspended ? "Restore Video" : "Suspend Video"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Video Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Permanently Delete Video</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the video "{selectedVideo?.title}". This action cannot be undone.
+              This action cannot be undone. The video and all associated data (comments, likes, and analytics) will be permanently deleted.
+              {selectedVideo?.title && (
+                <div className="mt-2 font-medium text-destructive">
+                  "{selectedVideo.title}"
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              className="bg-red-500 hover:bg-red-600"
-              onClick={handleDeleteConfirm}
+              onClick={handleDeleteVideo}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
