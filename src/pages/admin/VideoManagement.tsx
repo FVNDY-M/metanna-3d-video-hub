@@ -26,7 +26,6 @@ import {
   RadioGroup,
   RadioGroupItem 
 } from '@/components/ui/radio-group';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/AdminLayout';
 import { 
@@ -41,7 +40,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import EditVideoModal from '@/components/EditVideoModal';
 
-// Define interfaces for our data
 interface UserProfile {
   id: string;
   username: string;
@@ -68,36 +66,24 @@ interface Video {
 }
 
 const VideoManagement = () => {
-  // States for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
-  // States for modals
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Edit form states - we no longer need these as EditVideoModal handles this
-  // Remove the following lines:
-  // const [editTitle, setEditTitle] = useState('');
-  // const [editDescription, setEditDescription] = useState('');
-  // const [editCategory, setEditCategory] = useState('');
-  
-  // Suspension duration state
   const [suspensionDuration, setSuspensionDuration] = useState('permanent');
   
-  // Fetch videos with creator info
   const { data: videos, isLoading, refetch } = useQuery({
     queryKey: ['admin-videos', statusFilter],
     queryFn: async () => {
-      // First, fetch videos
       let query = supabase
         .from('videos')
         .select('*')
         .order('created_at', { ascending: false });
       
-      // Apply status filter
       if (statusFilter === 'suspended') {
         query = query.eq('is_suspended', true);
       } else if (statusFilter === 'active') {
@@ -115,7 +101,6 @@ const VideoManagement = () => {
         return [] as Video[];
       }
       
-      // Then, fetch user profiles separately
       const userIds = [...new Set(videoData.map(video => video.user_id))];
       
       const { data: userProfiles, error: profilesError } = await supabase
@@ -125,11 +110,9 @@ const VideoManagement = () => {
         
       if (profilesError) {
         console.error("Error fetching user profiles:", profilesError);
-        // Return videos without user info if there's an error
         return videoData as Video[];
       }
       
-      // Combine videos with user info
       return videoData.map(video => ({
         ...video,
         user: userProfiles.find(profile => profile.id === video.user_id) || { id: video.user_id, username: 'Unknown' }
@@ -137,7 +120,6 @@ const VideoManagement = () => {
     }
   });
   
-  // Filtered videos based on search query
   const filteredVideos = React.useMemo(() => {
     if (!videos) return [];
     
@@ -148,7 +130,6 @@ const VideoManagement = () => {
     );
   }, [videos, searchQuery]);
   
-  // Handle video suspension/restoration
   const handleToggleSuspension = async () => {
     if (!selectedVideo) return;
     
@@ -157,14 +138,12 @@ const VideoManagement = () => {
     try {
       let suspensionEndDate = null;
       
-      // If suspending and duration is 3 days, calculate end date
       if (isSuspending && suspensionDuration === '3days') {
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + 3);
         suspensionEndDate = endDate.toISOString();
       }
       
-      // Update video status
       const { error: updateError } = await supabase
         .from('videos')
         .update({ 
@@ -175,7 +154,6 @@ const VideoManagement = () => {
       
       if (updateError) throw updateError;
       
-      // Log the moderation action
       const { error: logError } = await supabase
         .from('moderation_actions')
         .insert({
@@ -210,35 +188,29 @@ const VideoManagement = () => {
     }
   };
   
-  // Handle video edit is now handled by EditVideoModal
   const handleVideoUpdated = async () => {
     await refetch();
     toast.success("Video details updated successfully");
   };
   
-  // Handle video deletion
-  const handleDeleteVideo = async () => {
-    if (!selectedVideo) return;
-    
+  const handleDeleteVideo = async (videoId: string) => {
     try {
-      // Log the moderation action first in case deletion succeeds
       const { error: logError } = await supabase
         .from('moderation_actions')
         .insert({
           admin_id: (await supabase.auth.getSession()).data.session?.user.id,
           action_type: 'video_delete',
           target_type: 'video',
-          target_id: selectedVideo.id,
+          target_id: videoId,
           details: { 
-            video_title: selectedVideo.title,
-            creator: selectedVideo.user?.username || "Unknown"
+            video_title: selectedVideo?.title || "Unknown",
+            creator: selectedVideo?.user?.username || "Unknown"
           }
         });
         
       if (logError) throw logError;
       
-      // Delete the video and all related data
-      const { success, error } = await deleteVideo(selectedVideo.id);
+      const { success, error } = await deleteVideo(videoId);
       
       if (!success) throw error;
       
@@ -253,26 +225,22 @@ const VideoManagement = () => {
     }
   };
   
-  // Open edit dialog and set form values
   const openEditDialog = (video: Video) => {
     setSelectedVideo(video);
     setIsEditModalOpen(true);
   };
   
-  // Open suspend/restore dialog
   const openSuspendDialog = (video: Video) => {
     setSelectedVideo(video);
     setSuspensionDuration('permanent');
     setIsSuspendDialogOpen(true);
   };
   
-  // Open delete dialog
   const openDeleteDialog = (video: Video) => {
     setSelectedVideo(video);
     setIsDeleteDialogOpen(true);
   };
   
-  // Format date for display
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
       day: 'numeric',
@@ -283,7 +251,6 @@ const VideoManagement = () => {
   
   return (
     <AdminLayout title="Video Management">
-      {/* Filters and Search */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -315,7 +282,6 @@ const VideoManagement = () => {
         </Select>
       </div>
       
-      {/* Videos Table */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-4 border-metanna-blue border-t-transparent rounded-full"></div>
@@ -415,7 +381,6 @@ const VideoManagement = () => {
         </div>
       )}
       
-      {/* EditVideoModal - New implementation */}
       <EditVideoModal 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -424,7 +389,6 @@ const VideoManagement = () => {
         onVideoDeleted={handleDeleteVideo}
       />
       
-      {/* Suspend/Restore Video Dialog */}
       <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
@@ -486,7 +450,6 @@ const VideoManagement = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Video Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

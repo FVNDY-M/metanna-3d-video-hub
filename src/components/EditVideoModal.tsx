@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
@@ -23,7 +22,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
 import { CropIcon, Upload, Trash2 } from 'lucide-react';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 
 interface EditVideoModalProps {
@@ -64,7 +62,6 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -298,7 +295,6 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
         }
       }
       
-      // Update the updated_at timestamp when saving changes
       const updateData = {
         title,
         description,
@@ -310,18 +306,16 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
       
       console.log('Updating video with data:', updateData);
       
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from('videos')
         .update(updateData)
-        .eq('id', videoId)
-        .select();
+        .eq('id', videoId);
 
       if (error) {
         console.error('Update error:', error);
         throw error;
       }
       
-      console.log('Video updated successfully:', data);
       toast.success('Video updated successfully');
       
       if (onVideoUpdated) {
@@ -345,6 +339,7 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     if (!videoId || !onVideoDeleted) return;
     try {
       await onVideoDeleted(videoId);
+      onClose();
     } catch (error) {
       console.error('Error in delete confirmation handler:', error);
     } finally {
