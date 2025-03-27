@@ -7,6 +7,7 @@ import { Heart, Share2, MessageSquare, Eye, Play, Trash2, AlertTriangle, Pin } f
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase, incrementVideoView, toggleCommentPinStatus } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
@@ -53,6 +54,15 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
   const [activeTab, setActiveTab] = useState('information');
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Permanently suspended';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
 
   useEffect(() => {
     const checkCurrentUser = async () => {
@@ -513,7 +523,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
             </div>
           ) : video ? (
             <div className="flex flex-col max-h-[90vh]">
-              {/* Suspension Warning Banner */}
               {video.isSuspended && (isOwnVideo || isAdmin) && (
                 <div className="bg-red-600 text-white p-3 text-center">
                   <div className="flex justify-center items-center gap-2">
@@ -527,7 +536,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                 </div>
               )}
             
-              {/* Video Player Section */}
               <div className="relative w-full aspect-video bg-black">
                 {isPlaying ? (
                   <video
@@ -557,10 +565,8 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                 )}
               </div>
               
-              {/* Content Section */}
               <ScrollArea className="flex-1 overflow-auto">
                 <div className="p-4">
-                  {/* Title and Actions */}
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xl font-bold">
                       {video.title}
@@ -584,7 +590,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                     )}
                   </div>
                   
-                  {/* Category tag */}
                   {video.category && (
                     <div className="mb-3">
                       <span className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
@@ -593,7 +598,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                     </div>
                   )}
                   
-                  {/* Creator info and subscribe button */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
@@ -622,7 +626,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                     )}
                   </div>
                   
-                  {/* Stats bar */}
                   <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center">
@@ -646,7 +649,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                     <span>{getTimeDifference(video.createdAt)}</span>
                   </div>
                   
-                  {/* Tabs for info and comments */}
                   <Tabs defaultValue="information" className="w-full">
                     <TabsList className="mb-4">
                       <TabsTrigger value="information">Information</TabsTrigger>
@@ -662,7 +664,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                     </TabsContent>
                     
                     <TabsContent value="comments" className="space-y-4">
-                      {/* Add comment form */}
                       <div className="flex items-start space-x-3 mb-6">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-gray-200">U</AvatarFallback>
@@ -687,7 +688,6 @@ const VideoModal: React.FC<VideoModalProps> = ({ isOpen, onClose, videoId }) => 
                         </div>
                       </div>
                     
-                      {/* Comments list */}
                       <div className="space-y-4">
                         {comments.map(comment => (
                           <div key={comment.id} className={`${comment.is_pinned ? 'bg-indigo-50 p-3 border-l-4 border-indigo-500 rounded-md' : ''}`}>
