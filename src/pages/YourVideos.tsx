@@ -99,6 +99,8 @@ const YourVideos = () => {
     // Refetch videos after an update
     fetchUserVideos();
     toast.success("Video updated successfully");
+    setIsEditModalOpen(false);
+    setEditingVideoId(null);
   };
   
   const handleVideoDeleted = async (videoId: string) => {
@@ -186,6 +188,7 @@ const YourVideos = () => {
         videoId={editingVideoId}
         onVideoUpdated={handleVideoUpdated}
         onVideoDeleted={handleVideoDeleted}
+        isAdmin={false}
       />
     </PageLayout>
   );

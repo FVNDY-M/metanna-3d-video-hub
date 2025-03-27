@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
@@ -23,7 +22,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoData } from './VideoCard';
 import { CropIcon, Upload, Trash2 } from 'lucide-react';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 
 interface EditVideoModalProps {
@@ -32,6 +30,7 @@ interface EditVideoModalProps {
   videoId: string | null;
   onVideoUpdated?: () => void;
   onVideoDeleted?: (videoId: string) => Promise<void>;
+  isAdmin?: boolean;
 }
 
 const videoCategories = [
@@ -55,7 +54,8 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   onClose, 
   videoId,
   onVideoUpdated,
-  onVideoDeleted
+  onVideoDeleted,
+  isAdmin = false
 }) => {
   const [video, setVideo] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,6 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -298,7 +297,6 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
         }
       }
       
-      // Update the updated_at timestamp when saving changes
       const updateData = {
         title,
         description,
@@ -310,11 +308,20 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
       
       console.log('Updating video with data:', updateData);
       
-      const { error, data } = await supabase
-        .from('videos')
-        .update(updateData)
-        .eq('id', videoId)
-        .select();
+      let query;
+      if (isAdmin) {
+        query = supabase
+          .from('videos')
+          .update(updateData)
+          .eq('id', videoId);
+      } else {
+        query = supabase
+          .from('videos')
+          .update(updateData)
+          .eq('id', videoId);
+      }
+      
+      const { error, data } = await query.select();
 
       if (error) {
         console.error('Update error:', error);
