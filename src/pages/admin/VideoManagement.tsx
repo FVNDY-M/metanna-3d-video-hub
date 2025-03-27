@@ -241,6 +241,19 @@ const VideoManagement = () => {
     setIsDeleteDialogOpen(true);
   };
   
+  const handleDeleteConfirm = async () => {
+    if (!selectedVideo || !selectedVideo.id) return;
+    try {
+      await handleDeleteVideo(selectedVideo.id);
+      onClose();
+    } catch (error) {
+      console.error('Error in delete confirmation handler:', error);
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSelectedVideo(null);
+    }
+  };
+  
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
       day: 'numeric',
@@ -466,7 +479,7 @@ const VideoManagement = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleDeleteVideo}
+              onClick={handleDeleteConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Permanently
