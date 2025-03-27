@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Eye, Edit, AlertTriangle, CheckCircle, Search, X, Trash2 } from 'lucide-react';
@@ -79,6 +78,12 @@ const VideoManagement = () => {
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
+  // Edit form states - we no longer need these as EditVideoModal handles this
+  // Remove the following lines:
+  // const [editTitle, setEditTitle] = useState('');
+  // const [editDescription, setEditDescription] = useState('');
+  // const [editCategory, setEditCategory] = useState('');
+  
   // Suspension duration state
   const [suspensionDuration, setSuspensionDuration] = useState('permanent');
   
@@ -89,7 +94,7 @@ const VideoManagement = () => {
       // First, fetch videos
       let query = supabase
         .from('videos')
-        .select('*, user:user_id(id, username, avatar_url)')
+        .select('*')
         .order('created_at', { ascending: false });
       
       // Apply status filter
@@ -110,15 +115,24 @@ const VideoManagement = () => {
         return [] as Video[];
       }
       
-      // Process videos with user info
+      // Then, fetch user profiles separately
+      const userIds = [...new Set(videoData.map(video => video.user_id))];
+      
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+        
+      if (profilesError) {
+        console.error("Error fetching user profiles:", profilesError);
+        // Return videos without user info if there's an error
+        return videoData as Video[];
+      }
+      
+      // Combine videos with user info
       return videoData.map(video => ({
         ...video,
-        // Handle the user object that comes from the join
-        user: video.user ? {
-          id: video.user.id,
-          username: video.user.username || 'Unknown',
-          avatar_url: video.user.avatar_url
-        } : { id: video.user_id, username: 'Unknown' }
+        user: userProfiles.find(profile => profile.id === video.user_id) || { id: video.user_id, username: 'Unknown' }
       })) as Video[];
     }
   });
@@ -196,14 +210,14 @@ const VideoManagement = () => {
     }
   };
   
-  // Handle video updates after edit
+  // Handle video edit is now handled by EditVideoModal
   const handleVideoUpdated = async () => {
     await refetch();
     toast.success("Video details updated successfully");
   };
   
-  // Handle video deletion - modified to match the expected return type of Promise<void>
-  const handleVideoDeleted = async (videoId: string): Promise<void> => {
+  // Handle video deletion
+  const handleDeleteVideo = async () => {
     if (!selectedVideo) return;
     
     try {
@@ -214,7 +228,7 @@ const VideoManagement = () => {
           admin_id: (await supabase.auth.getSession()).data.session?.user.id,
           action_type: 'video_delete',
           target_type: 'video',
-          target_id: videoId,
+          target_id: selectedVideo.id,
           details: { 
             video_title: selectedVideo.title,
             creator: selectedVideo.user?.username || "Unknown"
@@ -224,13 +238,12 @@ const VideoManagement = () => {
       if (logError) throw logError;
       
       // Delete the video and all related data
-      const { success, error } = await deleteVideo(videoId);
+      const { success, error } = await deleteVideo(selectedVideo.id);
       
       if (!success) throw error;
       
       toast.success("Video has been permanently deleted");
-      await refetch();
-      setIsEditModalOpen(false);
+      refetch();
     } catch (error) {
       console.error("Error deleting video:", error);
       toast.error("Failed to delete video");
@@ -408,7 +421,7 @@ const VideoManagement = () => {
         onClose={() => setIsEditModalOpen(false)}
         videoId={selectedVideo?.id || null}
         onVideoUpdated={handleVideoUpdated}
-        onVideoDeleted={handleVideoDeleted}
+        onVideoDeleted={handleDeleteVideo}
       />
       
       {/* Suspend/Restore Video Dialog */}
@@ -490,7 +503,7 @@ const VideoManagement = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => selectedVideo && handleVideoDeleted(selectedVideo.id)}
+              onClick={handleDeleteVideo}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Permanently
