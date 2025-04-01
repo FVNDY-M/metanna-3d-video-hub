@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Film, Users, Heart, MessageSquare, Eye, BarChart3 } from 'lucide-react';
@@ -9,8 +8,8 @@ import AdminLayout from '@/components/AdminLayout';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line, Tooltip, Legend } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useNavigate } from 'react-router-dom';
 
-// Define interfaces for our data
 interface AdminProfile {
   id: string;
   username: string;
@@ -60,11 +59,11 @@ interface DashboardStats {
 
 const AdminDashboard = () => {
   const [selectedUserTab, setSelectedUserTab] = useState<string>('all');
+  const navigate = useNavigate();
 
   const { data: statsData, isLoading: isStatsLoading } = useQuery({
     queryKey: ['admin-dashboard-stats'],
     queryFn: async () => {
-      // Get videos statistics with breakdown
       const { data: videosData, error: videosError } = await supabase
         .from('videos')
         .select('id, visibility, is_suspended');
@@ -74,13 +73,11 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch videos statistics");
       }
 
-      // Calculate video statistics
       const totalVideos = videosData.length;
       const publicVideos = videosData.filter(video => video.visibility === 'public' && !video.is_suspended).length;
       const privateVideos = videosData.filter(video => video.visibility === 'private').length;
       const suspendedVideos = videosData.filter(video => video.is_suspended).length;
 
-      // Get total users count
       const { count: totalUsers, error: usersError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
@@ -90,7 +87,6 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch users statistics");
       }
 
-      // Get total likes count
       const { count: totalLikes, error: likesError } = await supabase
         .from('likes')
         .select('*', { count: 'exact', head: true });
@@ -100,7 +96,6 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch likes statistics");
       }
 
-      // Get total comments count
       const { count: totalComments, error: commentsError } = await supabase
         .from('comments')
         .select('*', { count: 'exact', head: true });
@@ -110,7 +105,6 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch comments statistics");
       }
 
-      // Get recent moderation actions
       const { data: recentActions, error: actionsError } = await supabase
         .from('moderation_actions')
         .select('*')
@@ -122,7 +116,6 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch moderation actions");
       }
 
-      // First get the IDs of users who have videos
       const { data: creatorIdsData, error: creatorQueryError } = await supabase
         .from('videos')
         .select('user_id')
@@ -133,10 +126,8 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch creator IDs");
       }
       
-      // Extract the actual IDs from the result
       const creatorIds = creatorIdsData.map(item => item.user_id);
 
-      // Get content creators (users who have uploaded videos)
       const { data: contentCreators, error: creatorError } = await supabase
         .from('profiles')
         .select('id')
@@ -147,11 +138,9 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch creator statistics");
       }
 
-      // Calculate active vs normal users
       const activeUsers = contentCreators?.length || 0;
       const normalUsers = totalUsers - activeUsers;
       
-      // Get views count by summing all video views
       const { data: videoViewsData, error: viewsError } = await supabase
         .from('videos')
         .select('views');
@@ -161,8 +150,6 @@ const AdminDashboard = () => {
         throw new Error("Failed to fetch views statistics");
       }
 
-      // Generate time series data (simulated for now)
-      // In a real app, this would be querying historical data from the database
       const timeSeriesData: TimeSeriesData[] = [
         { name: 'Jan', totalUsers: totalUsers - 50, activeUsers: activeUsers - 10, normalUsers: normalUsers - 40 },
         { name: 'Feb', totalUsers: totalUsers - 40, activeUsers: activeUsers - 8, normalUsers: normalUsers - 32 },
@@ -172,13 +159,10 @@ const AdminDashboard = () => {
         { name: 'Jun', totalUsers: totalUsers, activeUsers: activeUsers, normalUsers: normalUsers }
       ];
 
-      // If we have admin actions, fetch the admin usernames separately
       let actionsWithAdmins: ModerationAction[] = [];
       if (recentActions && recentActions.length > 0) {
-        // Get unique admin IDs
         const adminIds = [...new Set(recentActions.map(action => action.admin_id))];
         
-        // Fetch admin profiles
         const { data: adminProfiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username')
@@ -188,7 +172,6 @@ const AdminDashboard = () => {
           console.error("Error fetching admin profiles:", profilesError);
           actionsWithAdmins = recentActions as ModerationAction[];
         } else {
-          // Map admin usernames to actions
           actionsWithAdmins = recentActions.map(action => {
             const adminProfile = adminProfiles?.find(profile => profile.id === action.admin_id);
             return {
@@ -221,10 +204,9 @@ const AdminDashboard = () => {
         timeSeriesData: timeSeriesData
       } as DashboardStats;
     },
-    refetchInterval: 60000, // Refetch every minute
+    refetchInterval: 60000,
   });
 
-  // Format the action type for display
   const formatActionType = (actionType: string) => {
     return actionType
       .split('_')
@@ -232,7 +214,6 @@ const AdminDashboard = () => {
       .join(' ');
   };
 
-  // Format the date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -244,7 +225,6 @@ const AdminDashboard = () => {
     }).format(date);
   };
 
-  // Get the appropriate time series data based on the selected tab
   const getChartData = () => {
     if (!statsData?.timeSeriesData) return [];
     
@@ -278,9 +258,11 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Statistics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-metanna-blue"
+              onClick={() => navigate('/admin/reports/videos')}
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-500">Total Videos</CardTitle>
               </CardHeader>
@@ -351,7 +333,6 @@ const AdminDashboard = () => {
             </Card>
           </div>
 
-          {/* User Stats Chart */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -410,7 +391,6 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Recent Moderation Actions */}
           <Card>
             <CardHeader>
               <CardTitle>Recent Moderation Actions</CardTitle>

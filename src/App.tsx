@@ -20,6 +20,7 @@ import EditProfile from "./pages/EditProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import AdminDashboard from "./pages/admin/Dashboard";
+import VideoReports from "./pages/admin/VideoReports";
 import VideoManagement from "./pages/admin/VideoManagement";
 import UserManagement from "./pages/admin/UserManagement";
 import ModerationLogs from "./pages/admin/ModerationLogs";
@@ -90,6 +91,14 @@ const App = () => (
             element={
               <AdminRoute>
                 <AdminDashboard />
+              </AdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/reports/videos" 
+            element={
+              <AdminRoute>
+                <VideoReports />
               </AdminRoute>
             } 
           />
