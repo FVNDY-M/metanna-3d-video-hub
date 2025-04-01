@@ -33,6 +33,13 @@ interface UserStats {
   normalUsers: number;
 }
 
+interface VideoStats {
+  totalVideos: number;
+  publicVideos: number;
+  privateVideos: number;
+  suspendedVideos: number;
+}
+
 interface TimeSeriesData {
   name: string;
   totalUsers: number;
@@ -41,7 +48,7 @@ interface TimeSeriesData {
 }
 
 interface DashboardStats {
-  totalVideos: number;
+  videoStats: VideoStats;
   userStats: UserStats;
   totalLikes: number;
   totalComments: number;
@@ -57,15 +64,21 @@ const AdminDashboard = () => {
   const { data: statsData, isLoading: isStatsLoading } = useQuery({
     queryKey: ['admin-dashboard-stats'],
     queryFn: async () => {
-      // Get total videos count
-      const { count: totalVideos, error: videosError } = await supabase
+      // Get videos statistics with breakdown
+      const { data: videosData, error: videosError } = await supabase
         .from('videos')
-        .select('*', { count: 'exact', head: true });
+        .select('id, visibility, is_suspended');
 
       if (videosError) {
-        console.error("Error fetching videos count:", videosError);
+        console.error("Error fetching videos data:", videosError);
         throw new Error("Failed to fetch videos statistics");
       }
+
+      // Calculate video statistics
+      const totalVideos = videosData.length;
+      const publicVideos = videosData.filter(video => video.visibility === 'public' && !video.is_suspended).length;
+      const privateVideos = videosData.filter(video => video.visibility === 'private').length;
+      const suspendedVideos = videosData.filter(video => video.is_suspended).length;
 
       // Get total users count
       const { count: totalUsers, error: usersError } = await supabase
@@ -139,7 +152,7 @@ const AdminDashboard = () => {
       const normalUsers = totalUsers - activeUsers;
       
       // Get views count by summing all video views
-      const { data: videosData, error: viewsError } = await supabase
+      const { data: videoViewsData, error: viewsError } = await supabase
         .from('videos')
         .select('views');
       
@@ -186,10 +199,15 @@ const AdminDashboard = () => {
         }
       }
 
-      const totalViews = videosData.reduce((sum, video) => sum + (video.views || 0), 0);
+      const totalViews = videoViewsData.reduce((sum, video) => sum + (video.views || 0), 0);
       
       return {
-        totalVideos: totalVideos,
+        videoStats: {
+          totalVideos,
+          publicVideos,
+          privateVideos,
+          suspendedVideos
+        },
         userStats: {
           totalUsers: totalUsers,
           activeUsers: activeUsers,
@@ -267,9 +285,25 @@ const AdminDashboard = () => {
                 <CardTitle className="text-sm font-medium text-gray-500">Total Videos</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center">
-                  <Film className="h-5 w-5 text-metanna-blue mr-2" />
-                  <span className="text-2xl font-bold">{statsData?.totalVideos.toLocaleString()}</span>
+                <div className="flex flex-col">
+                  <div className="flex items-center mb-2">
+                    <Film className="h-5 w-5 text-metanna-blue mr-2" />
+                    <span className="text-2xl font-bold">{statsData?.videoStats.totalVideos.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col text-xs text-gray-500 mt-1 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Public:</span>
+                      <span className="font-medium text-green-600">{statsData?.videoStats.publicVideos.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Private:</span>
+                      <span className="font-medium text-gray-600">{statsData?.videoStats.privateVideos.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Suspended:</span>
+                      <span className="font-medium text-red-600">{statsData?.videoStats.suspendedVideos.toLocaleString()}</span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
