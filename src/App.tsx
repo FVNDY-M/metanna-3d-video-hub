@@ -21,6 +21,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import AdminDashboard from "./pages/admin/Dashboard";
 import VideoReports from "./pages/admin/VideoReports";
+import UserReports from "./pages/admin/UserReports";
 import VideoManagement from "./pages/admin/VideoManagement";
 import UserManagement from "./pages/admin/UserManagement";
 import ModerationLogs from "./pages/admin/ModerationLogs";
@@ -99,6 +100,14 @@ const App = () => (
             element={
               <AdminRoute>
                 <VideoReports />
+              </AdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/reports/users" 
+            element={
+              <AdminRoute>
+                <UserReports />
               </AdminRoute>
             } 
           />

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Film, Users, Heart, MessageSquare, Eye, BarChart3 } from 'lucide-react';
@@ -290,7 +291,10 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-metanna-purple"
+              onClick={() => navigate('/admin/reports/users')}
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-500">Users</CardTitle>
               </CardHeader>
