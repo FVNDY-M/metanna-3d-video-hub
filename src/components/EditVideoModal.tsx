@@ -253,10 +253,15 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
       if (video?.thumbnail) {
         const existingThumbnailPath = extractFilenameFromUrl(video.thumbnail);
         if (existingThumbnailPath) {
-          await supabase.storage
+          const { error: deleteError } = await supabase.storage
             .from('thumbnails')
             .remove([existingThumbnailPath]);
-          console.log('Existing thumbnail deleted before uploading new one');
+            
+          if (deleteError) {
+            console.error('Error deleting previous thumbnail:', deleteError);
+          } else {
+            console.log('Previous thumbnail successfully deleted');
+          }
         }
       }
       
@@ -280,7 +285,10 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
       return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading thumbnail:', error);
-      toast.error('Failed to upload thumbnail');
+      toast('Failed to upload thumbnail', {
+        description: 'Please try again',
+        style: { backgroundColor: 'rgb(250, 179, 174)' }
+      });
       return null;
     } finally {
       setUploadingThumbnail(false);

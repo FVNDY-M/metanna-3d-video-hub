@@ -140,6 +140,35 @@ const EditProfile = () => {
     setIsUploadingAvatar(true);
     
     try {
+      // Delete the old avatar if it exists
+      if (avatarUrl) {
+        const extractOldPath = (url: string): string | null => {
+          try {
+            const parts = url.split('/');
+            if (parts.length >= 2) {
+              return `${currentUser.id}/${parts[parts.length - 1]}`;
+            }
+            return null;
+          } catch (error) {
+            console.error('Error extracting path from URL:', error);
+            return null;
+          }
+        };
+        
+        const oldFilePath = extractOldPath(avatarUrl);
+        if (oldFilePath) {
+          const { error: removeError } = await supabase.storage
+            .from('avatars')
+            .remove([oldFilePath]);
+            
+          if (removeError) {
+            console.error('Error removing old avatar:', removeError);
+          } else {
+            console.log('Old avatar removed successfully:', oldFilePath);
+          }
+        }
+      }
+      
       const fileExt = avatarFile.name.split('.').pop();
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `${currentUser.id}/${fileName}`;
