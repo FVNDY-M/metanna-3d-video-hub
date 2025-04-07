@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -9,12 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Save, Upload, X, User, Mail, AtSign } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Loader2, Save, Upload, X, User, Mail, AtSign, Trash } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, deleteUserAvatar } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 
 const profileSchema = z.object({
   username: z.string().min(3, {
@@ -35,8 +36,8 @@ const EditProfile = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isDeleteAvatarDialogOpen, setIsDeleteAvatarDialogOpen] = useState(false);
   
-  // Setup form with default values
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -51,7 +52,6 @@ const EditProfile = () => {
       setIsLoading(true);
       
       try {
-        // Get current user
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
@@ -61,7 +61,6 @@ const EditProfile = () => {
         
         setCurrentUser(session.user);
         
-        // Fetch user profile
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
@@ -70,16 +69,13 @@ const EditProfile = () => {
           
         if (error) throw error;
         
-        // Get user email
         const { data: { user } } = await supabase.auth.getUser();
         
-        // Set avatar preview if exists
         if (profile.avatar_url) {
           setAvatarUrl(profile.avatar_url);
           setAvatarPreview(profile.avatar_url);
         }
         
-        // Set form values
         form.reset({
           username: profile.username || '',
           bio: profile.bio || '',
@@ -105,7 +101,6 @@ const EditProfile = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Check if file is an image
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Invalid file type",
@@ -115,7 +110,6 @@ const EditProfile = () => {
       return;
     }
     
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -127,7 +121,6 @@ const EditProfile = () => {
     
     setAvatarFile(file);
     
-    // Create a preview
     const reader = new FileReader();
     reader.onload = (event) => {
       setAvatarPreview(event.target?.result as string);
@@ -137,7 +130,7 @@ const EditProfile = () => {
   
   const removeAvatar = () => {
     setAvatarFile(null);
-    setAvatarPreview(avatarUrl); // Reset to previous URL if available
+    setAvatarPreview(avatarUrl);
   };
   
   const uploadAvatar = async (): Promise<string | null> => {
@@ -146,19 +139,16 @@ const EditProfile = () => {
     setIsUploadingAvatar(true);
     
     try {
-      // Create a unique filename
       const fileExt = avatarFile.name.split('.').pop();
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `${currentUser.id}/${fileName}`;
       
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, avatarFile);
         
       if (uploadError) throw uploadError;
       
-      // Get public URL
       const { data } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
@@ -179,16 +169,43 @@ const EditProfile = () => {
     }
   };
   
+  const handleDeleteAvatar = async () => {
+    if (!avatarUrl || !currentUser) {
+      setIsDeleteAvatarDialogOpen(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const { success, error } = await deleteUserAvatar(currentUser.id, avatarUrl);
+      
+      if (!success) {
+        throw error || new Error("Failed to delete avatar");
+      }
+      
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      setAvatarUrl(null);
+      
+      toast.success("Avatar successfully deleted");
+    } catch (error) {
+      console.error("Error deleting avatar:", error);
+      toast.error("Failed to delete avatar. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setIsDeleteAvatarDialogOpen(false);
+    }
+  };
+  
   const onSubmit = async (values: ProfileFormValues) => {
     if (!currentUser) return;
     
     setIsLoading(true);
     
     try {
-      // Upload avatar if needed
       const finalAvatarUrl = await uploadAvatar();
       
-      // Update profile in database
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -206,7 +223,6 @@ const EditProfile = () => {
         description: "Your profile has been successfully updated.",
       });
       
-      // Redirect to profile page
       navigate(`/profile/${values.username}`);
       
     } catch (error) {
@@ -240,7 +256,6 @@ const EditProfile = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Profile Summary Card */}
           <div className="md:col-span-1">
             <Card className="bg-white shadow-md border-0">
               <CardContent className="p-6">
@@ -266,19 +281,55 @@ const EditProfile = () => {
                   </div>
                   
                   <div className="w-full mb-4">
-                    <label className="cursor-pointer inline-flex items-center justify-center w-full">
-                      <div className="bg-metanna-light-gray hover:bg-metanna-light-blue/10 transition-colors py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center space-x-2 w-full">
-                        <Upload className="h-4 w-4 text-metanna-blue" />
-                        <span>Change Avatar</span>
-                      </div>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarChange}
-                        disabled={isUploadingAvatar}
-                      />
-                    </label>
+                    <div className="flex gap-2">
+                      <label className="cursor-pointer inline-flex items-center justify-center flex-1">
+                        <div className="bg-metanna-light-gray hover:bg-metanna-light-blue/10 transition-colors py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center space-x-2 w-full">
+                          <Upload className="h-4 w-4 text-metanna-blue" />
+                          <span>Change</span>
+                        </div>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarChange}
+                          disabled={isUploadingAvatar}
+                        />
+                      </label>
+                      
+                      {avatarUrl && (
+                        <AlertDialog open={isDeleteAvatarDialogOpen} onOpenChange={setIsDeleteAvatarDialogOpen}>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              disabled={isLoading || isUploadingAvatar}
+                            >
+                              <Trash className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete your profile picture. Are you sure you want to continue?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={handleDeleteAvatar}
+                                className="bg-red-500 hover:bg-red-600 text-white"
+                              >
+                                {isLoading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : "Delete"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                     <p className="text-xs text-center text-metanna-gray mt-1">
                       Square image, max 5MB
                     </p>
@@ -303,7 +354,6 @@ const EditProfile = () => {
             </Card>
           </div>
           
-          {/* Profile Form */}
           <div className="md:col-span-2">
             <Card className="bg-white shadow-md border-0">
               <CardHeader className="border-b pb-3">

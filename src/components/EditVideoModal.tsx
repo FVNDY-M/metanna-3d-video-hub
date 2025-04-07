@@ -250,6 +250,16 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
     
     setUploadingThumbnail(true);
     try {
+      if (video?.thumbnail) {
+        const existingThumbnailPath = extractFilenameFromUrl(video.thumbnail);
+        if (existingThumbnailPath) {
+          await supabase.storage
+            .from('thumbnails')
+            .remove([existingThumbnailPath]);
+          console.log('Existing thumbnail deleted before uploading new one');
+        }
+      }
+      
       const fileName = `${videoId}_${Date.now()}.${thumbnailFile.name.split('.').pop()}`;
       
       const thumbnailToUpload = thumbnailCropped || thumbnailFile;
@@ -356,6 +366,20 @@ const EditVideoModal: React.FC<EditVideoModalProps> = ({
       console.error('Error in delete confirmation handler:', error);
     } finally {
       setIsDeleteDialogOpen(false);
+    }
+  };
+
+  const extractFilenameFromUrl = (url: string): string | null => {
+    try {
+      if (!url) return null;
+      
+      const parts = url.split('/');
+      const lastPart = parts[parts.length - 1];
+      
+      return decodeURIComponent(lastPart);
+    } catch (error) {
+      console.error('Error extracting filename from URL:', error);
+      return null;
     }
   };
 
