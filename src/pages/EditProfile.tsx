@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
@@ -15,7 +16,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { supabase, deleteUserAvatar } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from 'sonner';
+import { toast as sonnerToast } from 'sonner';
 
 const profileSchema = z.object({
   username: z.string().min(3, {
@@ -188,10 +189,17 @@ const EditProfile = () => {
       setAvatarPreview(null);
       setAvatarUrl(null);
       
-      toast.success("Avatar successfully deleted");
+      // Using sonnerToast instead of toast.success
+      sonnerToast("Avatar successfully deleted", {
+        description: "Your profile picture has been removed"
+      });
     } catch (error) {
       console.error("Error deleting avatar:", error);
-      toast.error("Failed to delete avatar. Please try again.");
+      // Using sonnerToast instead of toast.error
+      sonnerToast("Failed to delete avatar", {
+        description: "Please try again",
+        style: { backgroundColor: 'rgb(250, 179, 174)' }
+      });
     } finally {
       setIsLoading(false);
       setIsDeleteAvatarDialogOpen(false);
